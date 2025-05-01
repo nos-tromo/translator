@@ -165,6 +165,10 @@ def get_languages() -> list[dict[str, str]] | None:
     """
     try:
         LANGUAGE_NAMES = _load_language_codes()
+        if LANGUAGE_NAMES is None:
+            raise HTTPException(
+                status_code=500, detail="Language codes could not be loaded."
+            )
         return [
             {"code": code, "name": LANGUAGE_NAMES.get(code, code)}
             for code in LANGUAGE_NAMES
