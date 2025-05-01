@@ -16,7 +16,6 @@ file_formatter = logging.Formatter(
 file_handler.setFormatter(file_formatter)
 
 stream_handler = logging.StreamHandler()
-stream_handler.encoding = "utf-8"
 stream_formatter = logging.Formatter(
     "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
