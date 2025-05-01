@@ -106,6 +106,7 @@ class Translator:
             return {"name": src_lang_name, "flag": country_flag}
         except Exception as e:
             self.logger.error(f"Error detecting language: {e}")
+            return {"name": "", "flag": ""}
 
     def _model_inference(self, lang: str, text: str, verbose: bool = True) -> str:
         """
