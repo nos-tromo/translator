@@ -102,7 +102,7 @@ class Translator:
             text (str): Text to be translated.
 
         Returns:
-            str: Detected language
+            dict[str, str]: A dictionary containing the detected language name and country flag.
         """
         try:
             self.src_lang = detect(text)
