@@ -12,6 +12,11 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 
 class Translator:
+    """
+    Translator class for handling text translation using a pre-trained model.This class is designed
+    to work with the MADLAD-400 model and supports translation between multiple languages.
+    """
+
     def __init__(self):
         """
         Initializes the Translator:
