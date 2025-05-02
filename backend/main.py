@@ -121,7 +121,7 @@ def _load_language_codes(
     tags=["Translation"],
     response_model=TranslationResponse,
 )
-def translate(req: TranslationRequest) -> TranslationResponse:
+def translate(req: TranslationRequest) -> TranslationResponse | None:
     """
     POST endpoint for translating text between languages.
 
@@ -132,7 +132,7 @@ def translate(req: TranslationRequest) -> TranslationResponse:
         req (TranslationRequest): The translation input parameters.
 
     Returns:
-        TranslationResponse: A dictionary containing the translated text and detected language info.
+        TranslationResponse | None: A dictionary containing the translated text and detected language info.
     """
     try:
         detected_lang = translator.detect_language(req.text)
