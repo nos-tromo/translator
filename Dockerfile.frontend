@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir streamlit==1.45.0 requests==2.32.3
 
-COPY app.py .
+COPY translator/app.py .
 
 EXPOSE 8501
 
