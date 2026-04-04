@@ -37,18 +37,17 @@ from translator import Translator
 # === FastAPI Setup ===
 
 app = FastAPI(
-    title="MADLAD-400 Translation API",
-    description="Translate text using Google's MADLAD-400 model via Hugging Face Transformers.",
+    title="TranslateGemma Translation API",
+    description="Translate text using Google's TranslateGemma model via an OpenAI-compatible inference endpoint.",
     version="1.0.0",
 )
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:8080",  # Docker container
-        "http://127.0.0.1:8080",  # Docker container alternative
-        "http://localhost:5173",  # Vite frontend (dev)
-        "http://127.0.0.1:8000",  # FastAPI backend (dev)
-        "http://localhost:8000",  # FastAPI backend alternative (dev)
+        "http://localhost:8501",  # Streamlit frontend (Docker)
+        "http://127.0.0.1:8501",  # Streamlit frontend alternative
+        "http://localhost:8000",  # FastAPI backend (dev)
+        "http://127.0.0.1:8000",  # FastAPI backend alternative (dev)
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST"],
@@ -117,7 +116,7 @@ def _load_language_codes(
 @app.post(
     "/translate",
     summary="Translate text",
-    description="Translates input text to a target language using the MADLAD-400 model.",
+    description="Translates input text to a target language using TranslateGemma via an OpenAI-compatible endpoint.",
     tags=["Translation"],
     response_model=TranslationResponse,
 )
@@ -125,8 +124,8 @@ def translate(req: TranslationRequest) -> TranslationResponse | None:
     """
     POST endpoint for translating text between languages.
 
-    Accepts JSON payload with text and target language.
-    If source language is 'auto', language detection will be used.
+    Accepts JSON payload with text and target language code.
+    Source language is auto-detected.
 
     Args:
         req (TranslationRequest): The translation input parameters.
@@ -135,8 +134,10 @@ def translate(req: TranslationRequest) -> TranslationResponse | None:
         TranslationResponse | None: A dictionary containing the translated text and detected language info.
     """
     try:
+        LANGUAGE_NAMES = _load_language_codes()
+        trg_lang_name = LANGUAGE_NAMES.get(req.target_lang, req.target_lang)
         detected_lang = translator.detect_language(req.text)
-        result = translator.translate(req.target_lang, req.text)
+        result = translator.translate(trg_lang_name, req.text)
         return TranslationResponse(
             translation=result,
             detected_language=DetectedLanguage(
@@ -152,7 +153,7 @@ def translate(req: TranslationRequest) -> TranslationResponse | None:
 @app.get(
     "/languages",
     summary="List supported languages",
-    description="Returns a list of supported MADLAD-400 language codes with human-readable names, "
+    description="Returns a list of supported TranslateGemma language codes with human-readable names, "
     "based on the included `language_codes.json` file.",
     tags=["Metadata"],
 )

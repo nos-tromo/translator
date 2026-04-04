@@ -1,30 +1,14 @@
-# Stage 1: Build the application
-FROM node:18-alpine AS builder
+FROM python:3.11-slim
 
-# Set the working directory
 WORKDIR /app
 
-# Copy package files and install dependencies
-COPY package*.json ./
-RUN npm ci
+RUN pip install --no-cache-dir streamlit==1.45.0 requests==2.32.3
 
-# Copy the rest of the application files
-COPY . .
+COPY app.py .
 
-# Build the application
-RUN npm run build
+EXPOSE 8501
 
-# Stage 2: Serve the application with Nginx
-FROM nginx:stable-alpine
-
-# Remove default Nginx static files
-RUN rm -rf /usr/share/nginx/html/*
-
-# Copy built files from the builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Expose port 80
-EXPOSE 80
-
-# Command to run Nginx
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["streamlit", "run", "app.py", \
+     "--server.port=8501", \
+     "--server.address=0.0.0.0", \
+     "--server.headless=true"]

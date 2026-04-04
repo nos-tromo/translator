@@ -1,70 +1,28 @@
 services:
   #############################
-  # GPU-based Backend
+  # Backend (FastAPI)
   #############################
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    volumes:
-      - ${HF_CACHE:-${USERPROFILE:-$HOME}/.cache/huggingface}:/root/.cache/huggingface
-      - ${APPDATA:-${HOME}}/nltk_data:/root/nltk_data
     ports:
       - "8000:8000"
     environment:
-      - UVICORN_CMD=uvicorn main:app --host 0.0.0.0 --port 8000
-      - USE_DEVICE=auto
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              capabilities: [gpu]
-    profiles:
-      - gpu
+      - INFERENCE_API_BASE_URL=${INFERENCE_API_BASE_URL}
+      - INFERENCE_API_KEY=${INFERENCE_API_KEY:-dummy}
+      - INFERENCE_MODEL=${INFERENCE_MODEL:-google/translate-gemma-2b-it}
 
   #############################
-  # CPU-based Backend
-  #############################
-  backend-cpu:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    volumes:
-      - ${HF_CACHE:-${USERPROFILE:-$HOME}/.cache/huggingface}:/root/.cache/huggingface
-      - ${APPDATA:-${HOME}}/nltk_data:/root/nltk_data
-    ports:
-      - "8000:8000"
-    environment:
-      - UVICORN_CMD=uvicorn main:app --host 0.0.0.0 --port 8000
-      - USE_DEVICE=cpu
-    profiles:
-      - cpu
-
-  #############################
-  # GPU-based Frontend
+  # Frontend (Streamlit)
   #############################
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "8080:80"
+      - "8501:8501"
+    environment:
+      - BACKEND_URL=http://backend:8000
     depends_on:
       - backend
-    profiles:
-      - gpu
-
-  #############################
-  # CPU-based Frontend
-  #############################
-  frontend-cpu:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "8080:80"
-    depends_on:
-      - backend-cpu
-    profiles:
-      - cpu

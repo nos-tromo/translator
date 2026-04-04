@@ -1,90 +1,62 @@
 import logging
+import os
 from typing import Any
 
 import flag
 import pycountry
-import torch
 from langcodes import Language
 from langdetect import detect
-from nltk import sent_tokenize
-from pyarabic.araby import sentence_tokenize
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from openai import OpenAI
 
 
 class Translator:
     """
-    Translator class for handling text translation using a pre-trained model.This class is designed
-    to work with the MADLAD-400 model and supports translation between multiple languages.
+    Translator class for handling text translation using TranslateGemma via an
+    OpenAI-compatible chat/completions API endpoint.
     """
 
     def __init__(self):
         """
         Initializes the Translator:
         - Prepares logger for diagnostics.
-        - Loads the model, tokenizer, and device.
+        - Creates the OpenAI-compatible API client.
+        - Reads model name from environment.
         """
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.tokenizer, self.model, self.device = self._load_model()
+        self.client = self._create_client()
+        self.model = os.getenv("INFERENCE_MODEL", "google/translate-gemma-2b-it")
         self.src_lang = None
 
-    def _load_model(
-        self, model_name: str = "google/madlad400-3b-mt", local_only: bool = True
-    ) -> tuple[Any, Any, torch.device] | None:
+    def _create_client(self) -> OpenAI:
         """
-        Loads the translation model and tokenizer.
+        Creates an OpenAI-compatible client from environment variables.
 
-        Tries to load from local cache first. If not found, downloads from Hugging Face Hub.
+        Required env vars:
+            INFERENCE_API_BASE_URL: Base URL of the OpenAI-compatible endpoint.
 
-        Args:
-            model_name (str): The name of the pretrained model.
-            local_only (bool): Whether to restrict loading to local files only.
+        Optional env vars:
+            INFERENCE_API_KEY: API key (defaults to "dummy" for local servers).
 
         Returns:
-            tuple: (tokenizer, model, device) if successful.
+            OpenAI: Configured client instance.
         """
-        try:
-            device = torch.device(
-                "cuda"
-                if torch.cuda.is_available()
-                else "mps"
-                if torch.backends.mps.is_available()
-                else "cpu"
+        base_url = os.getenv("INFERENCE_API_BASE_URL")
+        api_key = os.getenv("INFERENCE_API_KEY", "dummy")
+        if not base_url:
+            raise ValueError(
+                "INFERENCE_API_BASE_URL environment variable is required."
             )
-            torch_dtype = (
-                torch.float16 if device.type in ["cuda", "mps"] else torch.float32
-            )
-
-            try:
-                tokenizer = AutoTokenizer.from_pretrained(
-                    model_name, local_files_only=True
-                )
-                model = AutoModelForSeq2SeqLM.from_pretrained(
-                    model_name, torch_dtype=torch_dtype, local_files_only=local_only
-                ).to(device)
-                self.logger.info("✅ Loaded model from local cache.")
-            except FileNotFoundError:
-                self.logger.info(
-                    "⬇️ Model not in local cache — downloading from Hugging Face..."
-                )
-                tokenizer = AutoTokenizer.from_pretrained(model_name)
-                model = AutoModelForSeq2SeqLM.from_pretrained(
-                    model_name, torch_dtype=torch_dtype
-                ).to(device)
-
-            return tokenizer, model, device
-        except Exception as e:
-            self.logger.error(f"Error while loading model: {e}")
-            raise
+        return OpenAI(base_url=base_url, api_key=api_key)
 
     def _get_country_flag(self, language_name: str) -> str:
         """
-        Convert a language name to the corresponding country flag.
+        Convert a language name to the corresponding country flag emoji.
 
         Args:
-            language (str): Language name (e.g. "French")
+            language_name (str): Language name (e.g. "French").
 
         Returns:
-            str: Country flag (e.g. "🇫🇷")
+            str: Country flag emoji (e.g. "🇫🇷"), or empty string on failure.
         """
         try:
             lang = Language.find(language_name)
@@ -96,92 +68,56 @@ class Translator:
 
     def detect_language(self, text: str) -> dict[str, str]:
         """
-        Detect the language of a text.
+        Detect the language of a text using langdetect.
 
         Args:
-            text (str): Text to be translated.
+            text (str): Text to detect the language of.
 
         Returns:
-            dict[str, str]: A dictionary containing the detected language name and country flag.
+            dict[str, str]: A dictionary with 'name' and 'flag' of the detected language.
         """
         try:
             self.src_lang = detect(text)
-            src_lang_name = pycountry.languages.get(alpha_2=self.src_lang).name
+            src_lang_obj = pycountry.languages.get(alpha_2=self.src_lang)
+            src_lang_name = src_lang_obj.name if src_lang_obj else self.src_lang
             country_flag = self._get_country_flag(src_lang_name)
             return {"name": src_lang_name, "flag": country_flag}
         except Exception as e:
             self.logger.error(f"Error detecting language: {e}")
             return {"name": "", "flag": ""}
 
-    def _model_inference(self, lang: str, text: str, verbose: bool = True) -> str:
+    def translate(self, trg_lang_name: str, text: str) -> str:
         """
-        Use the model for inference on a given text input.
+        Translates text to the target language using TranslateGemma via the
+        OpenAI-compatible chat/completions API.
+
+        Uses the prompt format recommended for TranslateGemma:
+            Translate the following text to {target_language}:
+            {text}
 
         Args:
-            lang (str): Target language code.
-            text (str): Text to translate.
-            verbose (bool): Set warning if the model's context window is exceeded
-
-        Returns:
-            str: The translated text.
-        """
-        try:
-            prompt = f"<2{lang}> {text}"
-            inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-
-            max_model_len = 256
-            input_ids = inputs.get("input_ids")
-            input_len = input_ids.shape[1]
-            adjusted_max_length = max_model_len
-
-            if input_len >= max_model_len:
-                if verbose:
-                    print(
-                        f"⚠️ Input length ({input_len} tokens) hits or exceeds max context window ({max_model_len}). Output may be truncated or degraded."
-                    )
-                    adjusted_max_length = input_len
-                else:
-                    adjusted_max_length = max_model_len
-
-            outputs = self.model.generate(
-                **inputs,
-                max_length=adjusted_max_length,
-                num_beams=4,
-                early_stopping=True,
-                no_repeat_ngram_size=3,
-            )
-            return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
-        except Exception as e:
-            self.logger.error(f"Error during model inference: {e}")
-            return ""
-
-    def translate(self, trg_lang: str, text: str) -> str:
-        """
-        Translates text sentence-wise between any supported MADLAD languages.
-
-        Args:
-            trg_lang (str): Target language code.
+            trg_lang_name (str): Full target language name (e.g. "French").
             text (str): Text to translate.
 
         Returns:
-            str: Final translated output.
+            str: Translated text.
         """
         try:
             if not text:
                 raise ValueError("Input text cannot be empty.")
-            if self.src_lang == "ar":
-                sentences = sentence_tokenize(text)  # Use pyarabic for Arabic
-            else:
-                sentences = sent_tokenize(text)  # Use nltk for other languages
-            if not sentences:
-                raise ValueError("No sentences found in the input text.")
-            return " ".join(
-                [
-                    self._model_inference(trg_lang, sentence)
-                    for sentence in sentences
-                    if len(sentence) > 0
-                ]
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Translate the following text to {trg_lang_name}:\n{text}"
+                        ),
+                    }
+                ],
             )
+            return response.choices[0].message.content.strip()
         except Exception as e:
-            self.logger.error(f"Error during translation pipeline: {e}")
+            self.logger.error(f"Error during translation: {e}")
             raise RuntimeError("Translation failed") from e
