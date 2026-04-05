@@ -1,22 +1,47 @@
-FROM python:3.11-slim
+ARG PYTHON_SLIM_BOOKWORM_IMAGE=python:3.11-slim-bookworm
+
+FROM ${PYTHON_SLIM_BOOKWORM_IMAGE} AS uv-installer
+
+RUN pip install --no-cache-dir uv==0.9.2
+
+FROM ${PYTHON_SLIM_BOOKWORM_IMAGE}
+
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG NO_PROXY
+ARG http_proxy
+ARG https_proxy
+ARG no_proxy
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PATH="/app/.venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONIOENCODING=utf-8 \
+    PYTHONUNBUFFERED=1 \
+    UV_CACHE_DIR=/root/.cache/uv \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    VIRTUAL_ENV=/app/.venv
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y curl ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 
-ENV PATH="/root/.local/bin:$PATH"
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+COPY --from=uv-installer /usr/local/bin/uv /usr/local/bin/uvx /bin/
 
-COPY pyproject.toml .
-COPY uv.lock .
+# Copy lockfile and project metadata first so the dependency install layer
+# is only invalidated when dependencies actually change, not on source changes.
+COPY pyproject.toml uv.lock ./
 
-RUN uv sync --frozen --no-cache
+RUN --mount=type=cache,target=${UV_CACHE_DIR} \
+    uv sync --frozen --no-dev --no-install-project
 
-ENV PYTHONPATH=/app
+COPY . .
 
-COPY translator/ ./translator/
+RUN --mount=type=cache,target=${UV_CACHE_DIR} \
+    uv sync --frozen --no-dev
 
 EXPOSE 8000
 
-CMD ["uv", "run", "--", "uvicorn", "translator.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "translator.main:app", "--host", "0.0.0.0", "--port", "8000"]
