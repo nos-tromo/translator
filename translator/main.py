@@ -2,37 +2,12 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-# === Logging Configuration ===
-
-logfile_name = f"backend_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-logs_dir = Path(".logs")
-logs_dir.mkdir(parents=True, exist_ok=True)
-logfile_path = logs_dir / logfile_name
-
-file_handler = logging.FileHandler(logfile_path, encoding="utf-8")
-file_formatter = logging.Formatter(
-    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-file_handler.setFormatter(file_formatter)
-
-stream_handler = logging.StreamHandler()
-stream_formatter = logging.Formatter(
-    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-stream_handler.setFormatter(stream_formatter)
-
-logging.basicConfig(
-    level=logging.INFO,
-    handlers=[file_handler, stream_handler],
-)
-
-
-import json
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
 from pydantic import BaseModel
 from translator.engine import Translator
+setup_logger()
 
 # === FastAPI Setup ===
 
