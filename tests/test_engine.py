@@ -24,6 +24,7 @@ def translator() -> Translator:
 
 # ── _create_client ─────────────────────────────────────────────────────────────
 
+
 def test_create_client_raises_without_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
     """Raises ``ValueError`` when ``OPENAI_API_BASE`` is unset.
 
@@ -46,6 +47,7 @@ def test_create_client_succeeds_with_base_url(translator: Translator) -> None:
 
 # ── _get_country_flag ──────────────────────────────────────────────────────────
 
+
 def test_get_country_flag_known_language(translator: Translator) -> None:
     """Returns a non-empty flag emoji for a recognised language name.
 
@@ -65,6 +67,7 @@ def test_get_country_flag_unknown_language(translator: Translator) -> None:
 
 
 # ── get_language_info ──────────────────────────────────────────────────────────
+
 
 def test_get_language_info_valid_code(translator: Translator) -> None:
     """Returns the correct name and a non-empty flag for a valid ISO 639-1 code.
@@ -89,6 +92,7 @@ def test_get_language_info_unknown_code(translator: Translator) -> None:
 
 
 # ── detect_language ────────────────────────────────────────────────────────────
+
 
 def test_detect_language_english(translator: Translator) -> None:
     """Detects English text and returns the resolved language name.
@@ -120,12 +124,15 @@ def test_detect_language_returns_empty_on_error(
         translator: Translator instance provided by the ``translator`` fixture.
         monkeypatch: Pytest fixture for patching ``translator.engine.detect``.
     """
-    monkeypatch.setattr("translator.engine.detect", lambda _: (_ for _ in ()).throw(Exception("fail")))
+    monkeypatch.setattr(
+        "translator.engine.detect", lambda _: (_ for _ in ()).throw(Exception("fail"))
+    )
     result = translator.detect_language("???")
     assert result == {"name": "", "flag": ""}
 
 
 # ── translate ──────────────────────────────────────────────────────────────────
+
 
 def test_translate_empty_text_raises(translator: Translator) -> None:
     """Raises ``RuntimeError`` when the input text is empty.
@@ -166,7 +173,9 @@ def test_translate_prompt_contains_lang_info(translator: Translator) -> None:
 
     translator.translate("Hello", "English", "en", "French", "fr")
 
-    prompt = translator.client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+    prompt = translator.client.chat.completions.create.call_args.kwargs["messages"][0][
+        "content"
+    ]
     assert "English (en)" in prompt
     assert "French (fr)" in prompt
     assert "Hello" in prompt
@@ -185,7 +194,9 @@ def test_translate_prompt_contains_source_text(translator: Translator) -> None:
 
     translator.translate("Good morning", "English", "en", "Spanish", "es")
 
-    prompt = translator.client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+    prompt = translator.client.chat.completions.create.call_args.kwargs["messages"][0][
+        "content"
+    ]
     assert "Good morning" in prompt
 
 
@@ -202,7 +213,10 @@ def test_translate_passes_model_to_client(translator: Translator) -> None:
 
     translator.translate("Hi", "English", "en", "French", "fr")
 
-    assert translator.client.chat.completions.create.call_args.kwargs["model"] == translator.model
+    assert (
+        translator.client.chat.completions.create.call_args.kwargs["model"]
+        == translator.model
+    )
 
 
 def test_translate_raises_on_connection_error(translator: Translator) -> None:
@@ -212,7 +226,9 @@ def test_translate_raises_on_connection_error(translator: Translator) -> None:
         translator: Translator instance provided by the ``translator`` fixture.
     """
     translator.client = MagicMock()
-    translator.client.chat.completions.create.side_effect = Exception("Connection refused")
+    translator.client.chat.completions.create.side_effect = Exception(
+        "Connection refused"
+    )
 
     with pytest.raises(RuntimeError, match="Translation failed"):
         translator.translate("Hello", "English", "en", "French", "fr")

@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 # ── GET /languages ─────────────────────────────────────────────────────────────
 
+
 def test_get_languages_returns_list(client: TestClient) -> None:
     """``GET /languages`` responds 200 with a non-empty list.
 
@@ -62,6 +63,7 @@ def test_get_languages_returns_500_on_missing_file(client: TestClient) -> None:
 
 
 # ── POST /translate ────────────────────────────────────────────────────────────
+
 
 def test_translate_auto_detect(client: TestClient) -> None:
     """``POST /translate`` auto-detects the source language and returns the translation.
