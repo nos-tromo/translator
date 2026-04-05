@@ -1,0 +1,49 @@
+[project]
+name = "translator"
+version = "0.1.0"
+description = "Simple translation tool."
+authors = [
+  { name = "nos-tromo" }
+]
+readme = "README.md"
+requires-python = ">=3.11,<4"
+dependencies = [
+    "dotenv>=0.9.9",
+    "emoji-country-flag>=2.0.1",
+    "fastapi>=0.115.12",
+    "langcodes[data]>=3.5.0",
+    "langdetect>=1.0.9",
+    "loguru>=0.7.3",
+    "openai>=1.75.0",
+    "pycountry>=24.6.1",
+    "pydantic>=2.11.2",
+    "requests>=2.33.1",
+    "streamlit>=1.56.0",
+    "types-requests>=2.33.0.20260402",
+    "uvicorn>=0.34.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.20.0",
+    "pre-commit>=4.5.1",
+    "pytest>=9.0.2",
+    "ruff>=0.15.9",
+]
+
+[build-system]
+requires = ["setuptools>=75.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["translator*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+docint = { workspace = true }

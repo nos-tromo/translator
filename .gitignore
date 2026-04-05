@@ -2,67 +2,29 @@
 # Global
 # -----------------
 .DS_Store
-.env
-.mypy_cache
-.idea/
-.vscode/
 *.code-workspace
 *.env
 *.ipynb
 *.log
 *.pyc
+*.txt
 
 # -----------------
 # Backend (Python)
 # -----------------
-backend/__pycache__/
-backend/.logs
-backend/.venv/
-backend/*.egg-info/
-backend/.mypy_cache/
-backend/.pytest_cache/
-
-# Compiled files and caches
-*.py[cod]
-*.so
-
-# SQLite DBs (optional)
-*.sqlite3
-*.db
-
-# -----------------
-# Frontend (Node/Vite)
-# -----------------
-
-frontend/node_modules/
-frontend/.parcel-cache/
-frontend/dist/
-frontend/dist-ssr/
-frontend/.env.local
-frontend/.env.*
-frontend/*.local
-frontend/.turbo/
-frontend/.output/
-
-# Frontend logs
-frontend/logs
-frontend/*.log
-frontend/npm-debug.log*
-frontend/yarn-debug.log*
-frontend/yarn-error.log*
-frontend/pnpm-debug.log*
-frontend/lerna-debug.log*
-
-# Optional editor/IDE/project file ignores (if working in frontend separately)
-frontend/.suo
-frontend/.ntvs*
-frontend/.njsproj
-frontend/.sln
-frontend/.sw?
-
-# Global frontend output
-dist/
-build/
+**/__pycache__/
+**/.claude/
+**/.idea/
+**/.log
+**/.venv/
+**/.vscode/
+**/*.egg-info/
+**/.mypy_cache/
+**/.pytest_cache/
+**/.ruff_cache/
+**/*.egg-info/
+**/dist/
+**/build/
 
 # -----------------
 # Docker

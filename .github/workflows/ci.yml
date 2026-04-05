@@ -1,0 +1,68 @@
+name: CI
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - '.env.example'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - '.env.example'
+
+jobs:
+  # ── Pytest ────────────────────────────────────────────────────────────────────
+  pytest:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_BASE: http://test-host:11434/v1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.11'
+          enable-cache: true          # caches ~/.cache/uv keyed on uv.lock
+
+      - name: Sync dependencies
+        run: uv sync --frozen --group dev
+
+      - name: Run tests
+        run: uv run pytest
+
+  # ── Docker builds ─────────────────────────────────────────────────────────────
+  build:
+    needs: pytest
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: backend
+            dockerfile: Dockerfile.backend
+          - name: frontend
+            dockerfile: Dockerfile.frontend
+
+    steps:
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.name }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          tags: translator-${{ matrix.name }}:ci-${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.dockerfile }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.dockerfile }}
