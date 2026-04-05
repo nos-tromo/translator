@@ -86,21 +86,32 @@ class Translator:
             self.logger.error(f"Error detecting language: {e}")
             return {"name": "", "flag": ""}
 
-    def translate(self, trg_lang_name: str, text: str) -> str:
-        """
-        Translates text to the target language using TranslateGemma via the
-        OpenAI-compatible chat/completions API.
+    def translate(
+        self,
+        text: str,
+        src_lang_name: str,
+        src_lang_code: str,
+        trg_lang_name: str,
+        trg_lang_code: str,
+    ) -> str:
+        """Translate text using the configured TranslateGemma model.
 
-        Uses the prompt format recommended for TranslateGemma:
-            Translate the following text to {target_language}:
-            {text}
+        Constructs a structured prompt following the TranslateGemma schema and
+        submits it to the OpenAI-compatible chat completions endpoint.
 
         Args:
-            trg_lang_name (str): Full target language name (e.g. "French").
-            text (str): Text to translate.
+            text: Source text to translate.
+            src_lang_name: Human-readable source language name (e.g. ``"French"``).
+            src_lang_code: ISO 639-1 source language code (e.g. ``"fr"``).
+            trg_lang_name: Human-readable target language name (e.g. ``"English"``).
+            trg_lang_code: ISO 639-1 target language code (e.g. ``"en"``).
 
         Returns:
-            str: Translated text.
+            The translated text with leading/trailing whitespace stripped.
+
+        Raises:
+            RuntimeError: If ``text`` is empty, the API call fails, or the model
+                returns non-string content.
         """
         try:
             if not text:
@@ -108,16 +119,13 @@ class Translator:
 
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": (
-                            f"Translate the following text to {trg_lang_name}:\n{text}"
-                        ),
-                    }
-                ],
+                messages=[{"role": "user", "content": prompt}],
             )
-            return response.choices[0].message.content.strip()
+
+            content = response.choices[0].message.content
+            if not isinstance(content, str):
+                raise RuntimeError("Translation response did not contain text content.")
+            return content.strip()
         except Exception as e:
             self.logger.error(f"Error during translation: {e}")
             raise RuntimeError("Translation failed") from e

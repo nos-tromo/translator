@@ -111,8 +111,16 @@ def translate(req: TranslationRequest) -> TranslationResponse | None:
     try:
         LANGUAGE_NAMES = _load_language_codes()
         trg_lang_name = LANGUAGE_NAMES.get(req.target_lang, req.target_lang)
-        detected_lang = translator.detect_language(req.text)
-        result = translator.translate(trg_lang_name, req.text)
+        if req.source_lang:
+            detected_lang = translator.get_language_info(req.source_lang)
+            src_lang_code = req.source_lang
+        else:
+            detected_lang = translator.detect_language(req.text)
+            src_lang_code = translator.src_lang
+        src_lang_name = detected_lang.get("name", src_lang_code)
+        result = translator.translate(
+            req.text, src_lang_name, src_lang_code, trg_lang_name, req.target_lang
+        )
         return TranslationResponse(
             translation=result,
             detected_language=DetectedLanguage(
