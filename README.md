@@ -24,6 +24,7 @@ docker volume create ollama-cache
 docker run -d \
   --network inference-net \
   --name ollama \
+  --gpus all \
   -v ollama-cache:/root/.ollama \
   -p 11434:11434 \
   ollama/ollama
