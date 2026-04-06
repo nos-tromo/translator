@@ -43,6 +43,7 @@ The project is a translation service with two components:
 | `OPENAI_API_KEY` | No | `dummy` | API key (use `dummy` for local servers) |
 | `TRANSLATE_MODEL` | No | `google/translate-gemma-2b-it` | Model identifier |
 | `BACKEND_URL` | No | `http://localhost:8000` | Frontend → backend URL |
+| `DEFAULT_TARGET_LANGUAGE` | No | `English` | Default target language in the frontend dropdown |
 
 ## Key Design Decisions
 

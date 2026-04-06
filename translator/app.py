@@ -13,6 +13,7 @@ import requests
 import streamlit as st
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+DEFAULT_TARGET_LANGUAGE = os.getenv("DEFAULT_TARGET_LANGUAGE", "English")
 
 st.set_page_config(page_title="Translator", page_icon="🌐", layout="wide")
 st.title("🌐 Translator")
@@ -52,7 +53,7 @@ with source_lang_col:
     source_lang_name = st.selectbox("Source language", source_lang_options, index=0)
 
 with target_lang_col:
-    default_index = lang_names.index("English") if "English" in lang_names else 0
+    default_index = lang_names.index(DEFAULT_TARGET_LANGUAGE) if DEFAULT_TARGET_LANGUAGE in lang_names else 0
     target_lang_name = st.selectbox("Target language", lang_names, index=default_index)
 
 # ── Text areas ─────────────────────────────────────────────────────────────────
