@@ -27,7 +27,7 @@ docker run -d \
   --gpus all \
   -v ollama-cache:/root/.ollama \
   -p 11434:11434 \
-  ollama/ollama:0.17.7
+  ollama/ollama:0.20.2
 
 # Preload translation model
 docker exec ollama ollama pull translategemma:4b
