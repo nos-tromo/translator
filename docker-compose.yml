@@ -17,6 +17,9 @@ x-base-image-build-env: &base-image-build-env
 x-build-args: &build-args
   <<: [*proxy-env, *base-image-build-env]
 
+x-env-file: &env-file
+  - .env
+
 services:
   #############################
   # Backend (FastAPI)
@@ -25,14 +28,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+      args:
+        <<: *build-args
     ports:
       - "8000:8000"
     environment:
-      <<: *proxy-env
       LOG_PATH: /var/log/translator/backend.log
       OPENAI_API_BASE: ${OPENAI_API_BASE}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       TRANSLATE_MODEL: ${TRANSLATE_MODEL:-translategemma:4b}
+    env_file: *env-file
     volumes:
       - translator-logs:/var/log/translator
     networks:
@@ -48,20 +53,22 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        <<: *build-args
     ports:
-      - "8501:8501"
+      - "${TRANSLATOR_HOST_PORT:-8501}:8501"
     environment:
-      <<: *proxy-env
       LOG_PATH: /var/log/translator/frontend.log
       BACKEND_URL: http://backend:8000
       STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
       DEFAULT_TARGET_LANGUAGE: ${DEFAULT_TARGET_LANGUAGE:-English}
-    depends_on:
-      - backend
+    env_file: *env-file
     volumes:
       - translator-logs:/var/log/translator
     networks:
       translator-net:
+    depends_on:
+      - backend
 
 #############################
 # Volumes
