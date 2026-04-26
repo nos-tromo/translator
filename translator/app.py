@@ -64,7 +64,11 @@ with target_lang_col:
 
 uploaded_file = st.file_uploader("Upload a .txt file (optional)", type=["txt"])
 if uploaded_file:
-    file_text = uploaded_file.read().decode("utf-8")
+    try:
+        file_text = uploaded_file.read().decode("utf-8")
+    except UnicodeDecodeError:
+        st.error("Uploaded file is not valid UTF-8 text.")
+        file_text = ""
 else:
     file_text = ""
 
