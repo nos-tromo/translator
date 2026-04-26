@@ -170,7 +170,7 @@ def translate(req: TranslationRequest) -> TranslationResponse | None:
             src_lang_code = req.source_lang
         else:
             detected_lang = translator.detect_language(req.text)
-            src_lang_code = translator.src_lang
+            src_lang_code = detected_lang.get("code", "")
         src_lang_name = detected_lang.get("name", src_lang_code)
         result = translator.translate(
             req.text, src_lang_name, src_lang_code, trg_lang_name, req.target_lang
@@ -182,6 +182,8 @@ def translate(req: TranslationRequest) -> TranslationResponse | None:
                 flag=detected_lang.get("flag", "🏳️"),
             ),
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error on /translate endpoint: {e}")
         raise HTTPException(status_code=500, detail="Translation failed.")
@@ -210,6 +212,8 @@ def get_languages() -> list[dict[str, str]]:
             {"code": code, "name": LANGUAGE_NAMES.get(code, code)}
             for code in LANGUAGE_NAMES
         ]
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error on /languages endpoint: {e}")
         raise HTTPException(status_code=500, detail="Failed to load language list.")
