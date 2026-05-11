@@ -58,7 +58,7 @@ def test_create_client_passes_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
 
         Returns:
             MagicMock: Dummy client instance to satisfy the Translator constructor.
-        """        
+        """
         captured.update(kwargs)
         return MagicMock()
 
@@ -81,7 +81,7 @@ def test_create_client_default_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
 
         Returns:
             MagicMock: Dummy client instance to satisfy the Translator constructor.
-        """        
+        """
         captured.update(kwargs)
         return MagicMock()
 
