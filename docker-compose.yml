@@ -3,19 +3,7 @@
 # This configuration sets up a backend service using FastAPI and a frontend service using Streamlit.
 # It also defines shared volumes for logging and networks for inter-service communication.
 #################################
-x-proxy-env: &proxy-env
-  HTTP_PROXY: ${HTTP_PROXY:-}
-  HTTPS_PROXY: ${HTTPS_PROXY:-}
-  NO_PROXY: ${NO_PROXY:-}
-  http_proxy: ${http_proxy:-}
-  https_proxy: ${https_proxy:-}
-  no_proxy: ${no_proxy:-}
-
-x-base-image-build-env: &base-image-build-env
-  PYTHON_SLIM_BOOKWORM_IMAGE: ${PYTHON_SLIM_BOOKWORM_IMAGE:-python:3.11.12-slim-bookworm}
-
-x-build-args: &build-args
-  <<: [*proxy-env, *base-image-build-env]
+name: translator
 
 x-env-file: &env-file
   - .env
@@ -25,11 +13,10 @@ services:
   # Backend (FastAPI)
   #############################
   backend:
+    image: translator-backend:${TRANSLATOR_VERSION:-latest}
     build:
       context: .
       dockerfile: Dockerfile.backend
-      args:
-        <<: *build-args
     ports:
       - "8000:8000"
     environment:
@@ -50,11 +37,10 @@ services:
   # Frontend (Streamlit)
   #############################
   frontend:
+    image: translator-frontend:${TRANSLATOR_VERSION:-latest}
     build:
       context: .
       dockerfile: Dockerfile.frontend
-      args:
-        <<: *build-args
     ports:
       - "${TRANSLATOR_HOST_PORT:-8501}:8501"
     environment:

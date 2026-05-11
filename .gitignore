@@ -32,3 +32,15 @@
 *.pid
 *.sock
 docker-compose.override.yml
+
+# -----------------
+# Files
+# -----------------
+*.bundle
+*.sh
+*.tar.gz
+
+# -----------------
+# Exceptions
+# -----------------
+!scripts/bundle_images.sh
