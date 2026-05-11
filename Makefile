@@ -30,11 +30,11 @@ bundle:
 
 # Run the stack without building
 no-build:
-	DOCKER_BUILDKIT=1 docker compose up -d --no-build
+	DOCKER_BUILDKIT=1 docker compose up --no-build
 
 # Build and run the stack
 up:
-	DOCKER_BUILDKIT=1 docker compose up -d
+	DOCKER_BUILDKIT=1 docker compose up
 
 # Stop the stack
 stop:
