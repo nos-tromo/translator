@@ -5,6 +5,10 @@
 #################################
 name: translator
 
+x-no-proxy-env: &no-proxy-env
+  NO_PROXY: "backend,localhost,127.0.0.1,172.16.0.0/12,10.0.0.0/8${EXTRA_NO_PROXY:-}"
+  no_proxy: "backend,localhost,127.0.0.1,172.16.0.0/12,10.0.0.0/8${EXTRA_NO_PROXY:-}"
+
 x-env-file: &env-file
   - .env
 
@@ -20,6 +24,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      <<: *no-proxy-env
       LOG_PATH: /var/log/translator/backend.log
       OPENAI_API_BASE: ${OPENAI_API_BASE}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
@@ -44,6 +49,7 @@ services:
     ports:
       - "${TRANSLATOR_HOST_PORT:-8501}:8501"
     environment:
+      <<: *no-proxy-env
       LOG_PATH: /var/log/translator/frontend.log
       BACKEND_URL: http://backend:8000
       STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
