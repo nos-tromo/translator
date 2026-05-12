@@ -12,7 +12,7 @@ TRANSLATOR_VERSION ?= $(shell \
       echo "$$(date +%Y-%m-%d)$${_s:+-$$_s}"; } )
 export TRANSLATOR_VERSION
 
-# Create the external Docker volumes (one-time per host; idempotent)
+# Create the external Docker network (one-time per host; idempotent)
 network:
 	DOCKER_BUILDKIT=1 docker network create inference-net
 
