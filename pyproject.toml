@@ -15,13 +15,13 @@ dependencies = [
     "langcodes[data]>=3.5.1",
     "langdetect>=1.0.9",
     "loguru>=0.7.3",
-    "openai>=2.36.0",
+    "openai>=2.37.0",
     "pycountry>=26.2.16",
     "pydantic>=2.13.4",
-    "requests>=2.33.1",
+    "requests>=2.34.2",
     "streamlit>=1.57.0",
-    "types-requests>=2.33.0.20260508",
-    "uvicorn>=0.46.0",
+    "types-requests>=2.33.0.20260513",
+    "uvicorn>=0.47.0",
 ]
 
 [project.urls]
@@ -29,13 +29,13 @@ Repository = "https://github.com/nos-tromo/translator.git"
 
 [dependency-groups]
 dev = [
-    "mypy>=2.0.0",
+    "mypy>=2.1.0",
     "pre-commit>=4.6.0",
     "pytest>=9.0.3",
-    "ruff>=0.15.12",
+    "ruff>=0.15.13",
 ]
 frontend = [
-    "requests>=2.33.1",
+    "requests>=2.34.2",
     "streamlit>=1.57.0",
 ]
 
