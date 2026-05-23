@@ -157,24 +157,18 @@ def test_detect_language_french_returns_code(translator: Translator) -> None:
     Args:
         translator: Translator instance provided by the ``translator`` fixture.
     """
-    result = translator.detect_language(
-        "Bonjour le monde, comment allez-vous aujourd'hui?"
-    )
+    result = translator.detect_language("Bonjour le monde, comment allez-vous aujourd'hui?")
     assert result["code"] == "fr"
 
 
-def test_detect_language_returns_empty_on_error(
-    translator: Translator, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_detect_language_returns_empty_on_error(translator: Translator, monkeypatch: pytest.MonkeyPatch) -> None:
     """Returns an empty ``code``/``name``/``flag`` dict when ``detect`` raises.
 
     Args:
         translator: Translator instance provided by the ``translator`` fixture.
         monkeypatch: Pytest fixture for patching ``translator.engine.detect``.
     """
-    monkeypatch.setattr(
-        "translator.engine.detect", lambda _: (_ for _ in ()).throw(Exception("fail"))
-    )
+    monkeypatch.setattr("translator.engine.detect", lambda _: (_ for _ in ()).throw(Exception("fail")))
     result = translator.detect_language("???")
     assert result == {"code": "", "name": "", "flag": ""}
 
@@ -237,9 +231,7 @@ def test_translate_prompt_contains_lang_info(translator: Translator) -> None:
 
     translator.translate("Hello", "English", "en", "French", "fr")
 
-    prompt = translator.client.chat.completions.create.call_args.kwargs["messages"][0][
-        "content"
-    ]
+    prompt = translator.client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
     assert "English (en)" in prompt
     assert "French (fr)" in prompt
     assert "Hello" in prompt
@@ -258,9 +250,7 @@ def test_translate_prompt_contains_source_text(translator: Translator) -> None:
 
     translator.translate("Good morning", "English", "en", "Spanish", "es")
 
-    prompt = translator.client.chat.completions.create.call_args.kwargs["messages"][0][
-        "content"
-    ]
+    prompt = translator.client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
     assert "Good morning" in prompt
 
 
@@ -277,10 +267,7 @@ def test_translate_passes_model_to_client(translator: Translator) -> None:
 
     translator.translate("Hi", "English", "en", "French", "fr")
 
-    assert (
-        translator.client.chat.completions.create.call_args.kwargs["model"]
-        == translator.model
-    )
+    assert translator.client.chat.completions.create.call_args.kwargs["model"] == translator.model
 
 
 def test_translate_raises_on_connection_error(translator: Translator) -> None:
@@ -290,9 +277,7 @@ def test_translate_raises_on_connection_error(translator: Translator) -> None:
         translator: Translator instance provided by the ``translator`` fixture.
     """
     translator.client = MagicMock()
-    translator.client.chat.completions.create.side_effect = Exception(
-        "Connection refused"
-    )
+    translator.client.chat.completions.create.side_effect = Exception("Connection refused")
 
     with pytest.raises(RuntimeError, match="Translation failed"):
         translator.translate("Hello", "English", "en", "French", "fr")

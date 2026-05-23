@@ -15,6 +15,7 @@ starts.
 
 import json
 from pathlib import Path
+from typing import cast
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -54,7 +55,7 @@ class TranslationRequest(BaseModel):
     """Request body for ``POST /translate``.
 
     Attributes:
-        text: The text to translate. Must be 1–``MAX_TEXT_LENGTH`` characters
+        text: The text to translate. Must be 1-``MAX_TEXT_LENGTH`` characters
             after stripping leading/trailing whitespace.
         target_lang: ISO 639-1 code of the desired target language (e.g. ``"fr"``).
         source_lang: ISO 639-1 code of the source language. When omitted the
@@ -129,8 +130,8 @@ def _load_language_codes(
     """
     try:
         language_path = Path(__file__).parent / filename
-        with open(language_path, "r", encoding="utf-8") as f:
-            return json.load(f)
+        with open(language_path, encoding="utf-8") as f:
+            return cast(dict[str, str], json.load(f))
     except FileNotFoundError as e:
         logger.error(f"Error loading language code file: {e}")
         raise
@@ -172,9 +173,7 @@ def translate(req: TranslationRequest) -> TranslationResponse | None:
             detected_lang = translator.detect_language(req.text)
             src_lang_code = detected_lang.get("code", "")
         src_lang_name = detected_lang.get("name", src_lang_code)
-        result = translator.translate(
-            req.text, src_lang_name, src_lang_code, trg_lang_name, req.target_lang
-        )
+        result = translator.translate(req.text, src_lang_name, src_lang_code, trg_lang_name, req.target_lang)
         return TranslationResponse(
             translation=result,
             detected_language=DetectedLanguage(
@@ -186,7 +185,7 @@ def translate(req: TranslationRequest) -> TranslationResponse | None:
         raise
     except Exception as e:
         logger.error(f"Error on /translate endpoint: {e}")
-        raise HTTPException(status_code=500, detail="Translation failed.")
+        raise HTTPException(status_code=500, detail="Translation failed.") from e
 
 
 @app.get(
@@ -208,12 +207,9 @@ def get_languages() -> list[dict[str, str]]:
     """
     try:
         LANGUAGE_NAMES = _load_language_codes()
-        return [
-            {"code": code, "name": LANGUAGE_NAMES.get(code, code)}
-            for code in LANGUAGE_NAMES
-        ]
+        return [{"code": code, "name": LANGUAGE_NAMES.get(code, code)} for code in LANGUAGE_NAMES]
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error on /languages endpoint: {e}")
-        raise HTTPException(status_code=500, detail="Failed to load language list.")
+        raise HTTPException(status_code=500, detail="Failed to load language list.") from e

@@ -30,7 +30,7 @@ class Translator:
         model: Model identifier passed to every completions request.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialise the Translator.
 
         Reads ``OPENAI_API_BASE`` (required) and ``TRANSLATE_MODEL`` (optional)

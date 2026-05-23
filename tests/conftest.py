@@ -14,6 +14,7 @@ os.environ.setdefault("OPENAI_API_BASE", "http://test-host:11434/v1")
 
 import pytest
 from fastapi.testclient import TestClient
+
 from translator.main import app
 
 
