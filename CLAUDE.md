@@ -2,52 +2,115 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Development Commands
+## Project Overview
 
-This project uses `uv` for dependency management (Python 3.11+).
+translator is a thin translation service: a FastAPI backend that calls a
+TranslateGemma-class model via any OpenAI-compatible chat/completions endpoint,
+fronted by a Streamlit UI. It runs no models of its own — it is a typed,
+audited, language-aware wrapper around an external inference endpoint.
+
+In the nos-tromo federation it sits next to chorus, docint, and Nextext as a
+fourth app: own repo, own release cycle, joins `inference-net`, no
+`data-net` attachment because it has no persistent state.
+
+## Commands
+
+This project uses `uv` (Python 3.11+). All commands run inside this directory.
 
 ```bash
-# Install dependencies
-uv sync
+# Install deps
+uv sync                              # production + dev deps
+uv sync --only-group frontend        # frontend-only deps (no openai/langdetect)
 
-# Run backend (FastAPI)
-uv run uvicorn translator.main:app --reload
-# API docs at http://127.0.0.1:8000/docs
+# Run locally (without Docker)
+uv run uvicorn translator.main:app --reload     # FastAPI on :8000, docs at /docs
+uv run streamlit run translator/app.py          # Streamlit on :8501
 
-# Run frontend (Streamlit)
-uv run streamlit run translator/app.py
-# UI at http://localhost:8501
+# Tests / lint / types
+uv run pytest                                   # full suite
+uv run pytest tests/test_x.py::test_name        # single test
+uv run pre-commit run --all-files               # ruff + mypy
 
-# Docker (CPU or GPU)
-docker compose --profile cpu up
-docker compose --profile gpu up
-# App at http://localhost:8080
+# Docker (preferred — matches production)
+make help                            # list build-host targets
+make network                         # one-time: create the external inference-net
+make build                           # build backend + frontend images
+make up                              # start the stack (uses docker/compose.{yaml,override.yaml})
+make stop                            # stop containers (keep them)
+make down                            # stop + remove containers (safe; no state volumes)
+make logs                            # tail combined logs
+make bundle                          # ship images as a versioned .tar.gz
 ```
 
-Note: The README.md contains outdated instructions referencing a `frontend/` Node.js app that no longer exists — the frontend is now Streamlit inside the `translator/` package. The Streamlit dependency is not in `pyproject.toml`; it must be installed separately (`pip install streamlit requests`) or is pulled in via Dockerfile.frontend.
+The Streamlit UI is at `http://localhost:${TRANSLATOR_HOST_PORT:-8501}`; the
+FastAPI docs at `http://localhost:8000/docs` (dev overlay only — base
+`docker/compose.yaml` does not publish host ports).
+
+> Note: the README.md is outdated — it references a `frontend/` Node.js app
+> that no longer exists. The current frontend is Streamlit inside the
+> `translator/` package; Streamlit is declared under `[dependency-groups].frontend`
+> so the frontend image installs only that group.
 
 ## Architecture
 
-The project is a translation service with two components:
+```
+translator/                       # the importable package
+  main.py        FastAPI app. Instantiates a single Translator at startup.
+                 Endpoints: POST /translate, GET /languages.
+  engine.py      Translator class. Wraps an OpenAI-compatible client to call
+                 a TranslateGemma model. Uses langdetect for source detection,
+                 pycountry/langcodes/emoji-country-flag for display metadata.
+  app.py         Streamlit UI. Thin HTTP client; calls BACKEND_URL.
+  log_cfg.py     Loguru setup (stderr + rotating file at LOG_PATH).
+  language_map.json
+                 Static ISO 639-1 → human-readable name map (~100 entries).
+                 Loaded by both endpoints.
+```
 
-- **`translator/main.py`** — FastAPI app. Instantiates a single `Translator` at startup. Exposes `POST /translate` (auto-detects source language, translates to target) and `GET /languages`. Loads `translator/language_map.json` on each request to map language codes to names.
-- **`translator/engine.py`** — `Translator` class. Wraps an OpenAI-compatible chat completions client to call a TranslateGemma model. Uses `langdetect` for source language detection, `pycountry`/`langcodes`/`emoji-country-flag` to produce flag emojis for detected languages.
-- **`translator/app.py`** — Streamlit UI. Accepts text input or file upload, calls the backend API, and displays the translation result with detected language info.
-- **`translator/language_map.json`** — Static mapping of ~100 language codes to human-readable names (used by both the `/languages` endpoint and the `/translate` endpoint to look up the target language name).
+The frontend never imports `engine` or any backend module — it speaks HTTP only.
+
+**Docker shape** (`docker/`):
+
+- `Dockerfile.backend` — multi-stage uv build, runs `uvicorn translator.main:app`.
+- `Dockerfile.frontend` — single-stage uv build that installs only the
+  `frontend` dependency group (no openai/langdetect), runs Streamlit.
+- `compose.yaml` — production shape: services on `translator-net` (internal)
+  + `inference-net` (external, shared); no host ports.
+- `compose.override.yaml` — dev overlay that publishes 8000 (backend) and
+  `${TRANSLATOR_HOST_PORT:-8501}` (frontend).
 
 ## Environment Variables
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `OPENAI_API_BASE` | Yes | — | Base URL of the OpenAI-compatible inference endpoint |
-| `OPENAI_API_KEY` | No | `dummy` | API key (use `dummy` for local servers) |
-| `TRANSLATE_MODEL` | No | `google/translate-gemma-2b-it` | Model identifier |
-| `BACKEND_URL` | No | `http://localhost:8000` | Frontend → backend URL |
-| `DEFAULT_TARGET_LANGUAGE` | No | `English` | Default target language in the frontend dropdown |
+| `OPENAI_API_BASE` | Yes | — | Base URL of the OpenAI-compatible inference endpoint (e.g. `http://vllm-router:4000/v1` or `http://ollama:11434/v1`) |
+| `OPENAI_API_KEY` | No | `dummy` | API key; `dummy` is fine for local servers that don't enforce auth |
+| `OPENAI_TIMEOUT` | No | `60` | Per-request timeout in seconds |
+| `TRANSLATE_MODEL` | No | `google/translate-gemma-2b-it` | Model identifier passed in every chat completions request |
+| `BACKEND_URL` | No (frontend) | `http://localhost:8000` | Where the Streamlit UI reaches the FastAPI backend |
+| `DEFAULT_TARGET_LANGUAGE` | No (frontend) | `English` | Pre-selected target in the UI dropdown |
+| `TRANSLATOR_HOST_PORT` | No | `8501` | Dev-only host port for the Streamlit UI |
+| `INFERENCE_NETWORK` | No | `inference-net` | External Docker network name to join |
+| `LOG_PATH` | No | `.log/translator.log` | Log sink file path |
+| `EXTRA_NO_PROXY` | No | — | Comma-separated hostnames appended to `NO_PROXY`; must start with `,` |
 
 ## Key Design Decisions
 
-- The `Translator` client is instantiated once at FastAPI startup (`translator = Translator()` in module scope of `main.py`), so `OPENAI_API_BASE` must be set before the server starts.
-- The translate prompt follows TranslateGemma's expected format: `"Translate the following text to {language}:\n{text}"`.
-- CORS is restricted to localhost:8501 and localhost:8000 only.
-- Logs are written to `.logs/backend_<timestamp>.log` relative to the working directory.
+- **No local models.** translator never ships or loads model weights. The
+  `OPENAI_API_BASE` swap is the only thing that changes between providers
+  (vllm-router, Ollama, an external OpenAI-compatible endpoint).
+- **Startup-time client.** `translator = Translator()` is module-scope in
+  `main.py`, so `OPENAI_API_BASE` must be set before uvicorn starts —
+  otherwise the import fails with a clear `ValueError`.
+- **Prompt is TranslateGemma-shaped.** The instruction includes both source
+  and target language names + ISO codes; the model is asked to emit only the
+  translation, no commentary. See `engine.py::Translator.translate`.
+- **CORS is locked to localhost ports.** `main.py` allows only
+  `localhost:8000` and `localhost:8501` (and their `127.0.0.1` equivalents).
+  Same-origin browser calls only — there is no public CORS surface.
+- **Dev overlay publishes ports; base does not.** Production deploys front the
+  frontend with the existing reverse proxy and rely on internal `expose`
+  ports; the `compose.override.yaml` overlay is only used for `make up` in dev.
+- **No persistent volumes for app state.** The only volume is shared logs
+  between backend and frontend, so `make down` (and even
+  `docker compose down -v`) is always safe.

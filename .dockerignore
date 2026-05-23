@@ -40,8 +40,6 @@
 .env*
 .pre-commit-config.yaml
 AGENTS.md
-docker-compose.yml
-Dockerfile*
 LICENSE
 README.md
 
@@ -75,6 +73,6 @@ README.md
 *.pid
 *.sock
 .translator-version
-docker-compose.override.yml
+docker/
 
 # Exceptions

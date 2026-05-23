@@ -18,12 +18,15 @@ else
 fi
 echo "TRANSLATOR_VERSION=$TRANSLATOR_VERSION"
 
-# Persist the version so production hosts can run 'make no-build-*' without
-# git or the original build date. Copy this file alongside docker-compose.yml.
+# Persist the version so production hosts can run 'make up' without
+# git or the original build date. Copy this file alongside the docker/
+# directory.
 echo "$TRANSLATOR_VERSION" > .translator-version
 
+COMPOSE=(docker compose --env-file .env -f docker/compose.yaml -f docker/compose.override.yaml)
+
 # Build locally-defined services
-docker compose build
+"${COMPOSE[@]}" build
 
 # Partition compose's image list and ensure local tag bindings exist:
 #   built  = local-only names like "translator-backend" (already tagged by build)
@@ -49,7 +52,7 @@ while IFS= read -r img; do
   else
     built+=("$img")
   fi
-done < <(docker compose config --images)
+done < <("${COMPOSE[@]}" config --images)
 
 echo "Built images:  ${built[*]:-<none>}"
 

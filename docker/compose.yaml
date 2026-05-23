@@ -1,0 +1,76 @@
+### translator app compose — app services only.
+###
+### No persistent state lives in this project; the only volume is a shared
+### logs volume between backend and frontend. `docker compose down -v` in
+### this project is always safe.
+###
+### Production shape: no host ports. The dev overlay in
+### compose.override.yaml publishes ports for local browsing; production
+### deploys front the frontend with the existing reverse proxy.
+
+name: translator
+
+x-no-proxy-env: &no-proxy-env
+  NO_PROXY: "backend,frontend,localhost,127.0.0.1,172.16.0.0/12,10.0.0.0/8${EXTRA_NO_PROXY:-}"
+  no_proxy: "backend,frontend,localhost,127.0.0.1,172.16.0.0/12,10.0.0.0/8${EXTRA_NO_PROXY:-}"
+
+x-env-file: &env-file
+  - path: ../.env
+    required: false
+
+services:
+  backend:
+    image: translator-backend:${TRANSLATOR_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    environment:
+      <<: *no-proxy-env
+      LOG_PATH: /var/log/translator/backend.log
+      OPENAI_API_BASE: ${OPENAI_API_BASE}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-dummy}
+      TRANSLATE_MODEL: ${TRANSLATE_MODEL:-google/translate-gemma-2b-it}
+    env_file: *env-file
+    volumes:
+      - translator-logs:/var/log/translator
+    networks:
+      translator-net:
+        aliases:
+          - backend
+      inference-net:
+        aliases:
+          - translator-backend
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  frontend:
+    image: translator-frontend:${TRANSLATOR_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    environment:
+      <<: *no-proxy-env
+      LOG_PATH: /var/log/translator/frontend.log
+      BACKEND_URL: http://backend:8000
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+      DEFAULT_TARGET_LANGUAGE: ${DEFAULT_TARGET_LANGUAGE:-English}
+    env_file: *env-file
+    volumes:
+      - translator-logs:/var/log/translator
+    networks:
+      translator-net:
+    depends_on:
+      - backend
+    expose:
+      - "8501"
+    restart: unless-stopped
+
+volumes:
+  translator-logs:
+
+networks:
+  translator-net: {}
+  inference-net:
+    external: true
+    name: ${INFERENCE_NETWORK:-inference-net}

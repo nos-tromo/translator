@@ -1,0 +1,16 @@
+### Dev-only override: publish backend + frontend to the host.
+###
+### Production fronts the frontend with the existing reverse proxy and
+### relies on the internal `expose` ports in compose.yaml, so this file
+### is intentionally *not* loaded by direct
+### `docker compose -f docker/compose.yaml` invocations. The translator
+### Makefile passes both files explicitly so `make up` works in dev;
+### production deploy runbooks should not.
+
+services:
+  backend:
+    ports:
+      - "8000:8000"
+  frontend:
+    ports:
+      - "${TRANSLATOR_HOST_PORT:-8501}:8501"
