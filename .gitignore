@@ -2,6 +2,7 @@
 # Global
 # -----------------
 .DS_Store
+*.
 *.code-workspace
 *.env
 *.ipynb
@@ -31,6 +32,7 @@
 # -----------------
 *.pid
 *.sock
+.translator-version
 docker-compose.override.yml
 
 # -----------------
