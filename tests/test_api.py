@@ -13,7 +13,6 @@ from fastapi.testclient import TestClient
 
 from translator.main import MAX_TEXT_LENGTH
 
-
 # ── GET /languages ─────────────────────────────────────────────────────────────
 
 

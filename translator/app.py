@@ -8,6 +8,7 @@ column without shifting the page layout.
 """
 
 import os
+from typing import Any
 
 import requests
 import streamlit as st
@@ -20,7 +21,7 @@ st.title("🌐 Translator")
 
 
 @st.cache_data(show_spinner=False)
-def load_languages() -> list[dict]:
+def load_languages() -> list[dict[str, Any]]:
     """Fetch the list of supported languages from the backend and sort by name.
 
     Results are cached for the lifetime of the Streamlit session so that the
@@ -49,15 +50,11 @@ AUTO_DETECT = "Auto-detect"
 source_lang_col, target_lang_col = st.columns(2)
 
 with source_lang_col:
-    source_lang_options = [AUTO_DETECT] + lang_names
+    source_lang_options = [AUTO_DETECT, *lang_names]
     source_lang_name = st.selectbox("Source language", source_lang_options, index=0)
 
 with target_lang_col:
-    default_index = (
-        lang_names.index(DEFAULT_TARGET_LANGUAGE)
-        if DEFAULT_TARGET_LANGUAGE in lang_names
-        else 0
-    )
+    default_index = lang_names.index(DEFAULT_TARGET_LANGUAGE) if DEFAULT_TARGET_LANGUAGE in lang_names else 0
     target_lang_name = st.selectbox("Target language", lang_names, index=default_index)
 
 # ── Text areas ─────────────────────────────────────────────────────────────────
@@ -118,11 +115,7 @@ if st.button("Translate", type="primary", disabled=not text.strip()):
     detected_name = detected.get("name", "")
     detected_flag = detected.get("flag", "")
     if detected_name:
-        label = (
-            "Detected source language"
-            if source_lang_name == AUTO_DETECT
-            else "Source language"
-        )
+        label = "Detected source language" if source_lang_name == AUTO_DETECT else "Source language"
         st.info(f"{label}: {detected_flag} {detected_name}")
 
     translation_placeholder.text_area(

@@ -25,7 +25,7 @@ LOG_PATH: Path = Path(os.getenv("LOG_PATH", DEFAULT_LOG_DIR))
 
 
 def setup_logger(
-    encoding="utf-8",
+    encoding: str = "utf-8",
     rotation: str = "5 MB",
     retention: int = 3,
     backtrace: bool = False,
