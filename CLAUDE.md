@@ -61,7 +61,7 @@ translator/                       # the importable package
                  a TranslateGemma model. Uses langdetect for source detection,
                  pycountry/langcodes/emoji-country-flag for display metadata.
   app.py         Streamlit UI. Thin HTTP client; calls BACKEND_URL.
-  log_cfg.py     Loguru setup (stderr + rotating file at LOG_PATH).
+  log_cfg.py     Loguru setup (stderr only; container driver rotates).
   language_map.json
                  Static ISO 639-1 → human-readable name map (~100 entries).
                  Loaded by both endpoints.
@@ -91,7 +91,7 @@ The frontend never imports `engine` or any backend module — it speaks HTTP onl
 | `DEFAULT_TARGET_LANGUAGE` | No (frontend) | `English` | Pre-selected target in the UI dropdown |
 | `TRANSLATOR_HOST_PORT` | No | `8501` | Dev-only host port for the Streamlit UI |
 | `INFERENCE_NETWORK` | No | `inference-net` | External Docker network name to join |
-| `LOG_PATH` | No | `.log/translator.log` | Log sink file path |
+| `LOG_LEVEL` | No | `INFO` | Minimum log level emitted on stderr |
 | `EXTRA_NO_PROXY` | No | — | Comma-separated hostnames appended to `NO_PROXY`; must start with `,` |
 
 ## Key Design Decisions
@@ -111,6 +111,6 @@ The frontend never imports `engine` or any backend module — it speaks HTTP onl
 - **Dev overlay publishes ports; base does not.** Production deploys front the
   frontend with the existing reverse proxy and rely on internal `expose`
   ports; the `compose.override.yaml` overlay is only used for `make up` in dev.
-- **No persistent volumes for app state.** The only volume is shared logs
-  between backend and frontend, so `make down` (and even
+- **No volumes at all.** The compose project declares none — logs go to
+  the container logging driver — so `make down` (and even
   `docker compose down -v`) is always safe.
