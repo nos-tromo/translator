@@ -29,7 +29,7 @@ Repository = "https://github.com/nos-tromo/translator.git"
 
 [dependency-groups]
 dev = [
-    "mypy==2.1.0",
+    "mypy==1.19.0",
     "pre-commit>=4.6.0",
     "pytest>=9.0.3",
     "ruff==0.15.14",
