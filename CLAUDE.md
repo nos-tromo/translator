@@ -35,7 +35,8 @@ uv run pre-commit run --all-files               # ruff + mypy
 make help                            # list build-host targets
 make network                         # one-time: create the external inference-net
 make build                           # build backend + frontend images
-make up                              # start the stack (uses docker/compose.{yaml,override.yaml})
+make up                              # start the stack (production shape — base docker/compose.yaml only)
+make up-dev                          # like 'up', but publishes backend + frontend ports on the host
 make stop                            # stop containers (keep them)
 make down                            # stop + remove containers (safe; no state volumes)
 make logs                            # tail combined logs
@@ -110,7 +111,7 @@ The frontend never imports `engine` or any backend module — it speaks HTTP onl
   Same-origin browser calls only — there is no public CORS surface.
 - **Dev overlay publishes ports; base does not.** Production deploys front the
   frontend with the existing reverse proxy and rely on internal `expose`
-  ports; the `compose.override.yaml` overlay is only used for `make up` in dev.
+  ports; the `compose.override.yaml` overlay is only used for `make up-dev` in dev.
 - **No volumes at all.** The compose project declares none — logs go to
   the container logging driver — so `make down` (and even
   `docker compose down -v`) is always safe.

@@ -7,7 +7,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help network build bundle up stop down logs pre-commit test
+.PHONY: help network build bundle up up-dev stop down logs pre-commit test
 
 # Versioned image tag.
 # On production: read from .translator-version written by bundle_images.sh.
@@ -19,7 +19,8 @@ TRANSLATOR_VERSION ?= $(shell \
       echo "$$(date +%Y-%m-%d)$${_s:+-$$_s}"; } )
 export TRANSLATOR_VERSION
 
-COMPOSE := docker compose --env-file .env -f docker/compose.yaml -f docker/compose.override.yaml
+COMPOSE     := docker compose --env-file .env -f docker/compose.yaml
+COMPOSE_DEV := docker compose --env-file .env -f docker/compose.yaml -f docker/compose.override.yaml
 
 help:
 	@echo "translator — FastAPI backend + Streamlit frontend."
@@ -27,7 +28,8 @@ help:
 	@echo "  make network    create the shared inference-net"
 	@echo "  make build      build backend + frontend images"
 	@echo "  make bundle     ship images as a versioned .tar.gz (built locally)"
-	@echo "  make up         start backend + frontend"
+	@echo "  make up         start backend + frontend (production shape, no host ports)"
+	@echo "  make up-dev     like 'up', but publishes backend + frontend ports on the host"
 	@echo "  make stop       stop containers (keep them)"
 	@echo "  make down       stop + remove containers"
 	@echo "  make logs       tail combined logs"
@@ -46,9 +48,14 @@ build:
 bundle:
 	./scripts/bundle_images.sh
 
-# Start backend + frontend without rebuilding.
+# Start backend + frontend without rebuilding (production shape, no host ports).
 up:
 	DOCKER_BUILDKIT=1 $(COMPOSE) up --no-build
+
+# Like 'up' but layers compose.override.yaml on top to publish the
+# backend (8000) and frontend (Streamlit) ports on the host.
+up-dev:
+	DOCKER_BUILDKIT=1 $(COMPOSE_DEV) up --no-build
 
 # Stop containers without removing them.
 stop:
