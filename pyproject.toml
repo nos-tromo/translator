@@ -11,11 +11,11 @@ license = "Apache-2.0"
 dependencies = [
     "dotenv>=0.9.9",
     "emoji-country-flag>=2.1.0",
-    "fastapi>=0.136.3",
+    "fastapi>=0.137.0",
     "langcodes[data]>=3.5.1",
     "langdetect>=1.0.9",
     "loguru>=0.7.3",
-    "openai>=2.41.0",
+    "openai>=2.41.1",
     "pycountry>=26.2.16",
     "pydantic>=2.13.4",
     "requests>=2.34.2",
@@ -31,7 +31,7 @@ Repository = "https://github.com/nos-tromo/translator.git"
 dev = [
     "mypy==1.19.0",
     "pre-commit>=4.6.0",
-    "pytest>=9.0.3",
+    "pytest>=9.1.0",
     "ruff==0.15.14",
 ]
 frontend = [
