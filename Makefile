@@ -14,6 +14,7 @@
 
 REPO     := translator
 NETWORKS := inference-net
+UP_ENV   := DOCKER_BUILDKIT=1
 UP_FLAGS := --no-build
 include make/common.mk
 
