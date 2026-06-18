@@ -4,24 +4,21 @@
 ### call inference over the shared `inference-net`. It has no local GPU
 ### code and no persistent state of its own, so there are no
 ### `cpu`/`cuda` profiles and `docker compose down -v` is always safe.
+###
+### The lifecycle targets (network/build/bundle/up/up-dev/stop/down/logs/
+### pre-commit/test) + the versioned image tag come from make/common.mk,
+### vendored from nos-tromo/.github. Only translator-specific config and the
+### help text live here.
 
 .DEFAULT_GOAL := help
 
-.PHONY: help network build bundle up up-dev stop down logs pre-commit test
+REPO     := translator
+NETWORKS := inference-net
+UP_ENV   := DOCKER_BUILDKIT=1
+UP_FLAGS := --no-build
+include make/common.mk
 
-# Versioned image tag.
-# On production: read from .translator-version written by bundle_images.sh.
-# On dev: compute YYYY-MM-DD[-<short-sha>] on the fly.
-# Override entirely by exporting TRANSLATOR_VERSION before invoking make.
-TRANSLATOR_VERSION ?= $(shell \
-    cat .translator-version 2>/dev/null || \
-    { _s=$$(git rev-parse --short HEAD 2>/dev/null); \
-      echo "$$(date +%Y-%m-%d)$${_s:+-$$_s}"; } )
-export TRANSLATOR_VERSION
-
-COMPOSE     := docker compose --env-file .env -f docker/compose.yaml
-COMPOSE_DEV := docker compose --env-file .env -f docker/compose.yaml -f docker/compose.override.yaml
-
+.PHONY: help
 help:
 	@echo "translator — FastAPI backend + Streamlit frontend."
 	@echo
@@ -35,45 +32,3 @@ help:
 	@echo "  make logs       tail combined logs"
 	@echo "  make pre-commit run pre-commit hooks (ruff + mypy)"
 	@echo "  make test       run pytest"
-
-# Create the shared external network (one-time per host; idempotent).
-network:
-	docker network create inference-net >/dev/null 2>&1 || true
-
-# Build backend + frontend images.
-build:
-	DOCKER_BUILDKIT=1 $(COMPOSE) build
-
-# Build images and ship as a versioned .tar.gz (built + pulled).
-bundle:
-	./scripts/bundle_images.sh
-
-# Start backend + frontend without rebuilding (production shape, no host ports).
-up:
-	DOCKER_BUILDKIT=1 $(COMPOSE) up --no-build
-
-# Like 'up' but layers compose.override.yaml on top to publish the
-# backend (8000) and frontend (Streamlit) ports on the host.
-up-dev:
-	DOCKER_BUILDKIT=1 $(COMPOSE_DEV) up --no-build
-
-# Stop containers without removing them.
-stop:
-	$(COMPOSE) stop
-
-# Stop + remove containers. No application-state volumes exist, so this
-# is always safe.
-down:
-	$(COMPOSE) down
-
-# Tail combined logs.
-logs:
-	$(COMPOSE) logs -f --tail=100
-
-# Run pre-commit hooks (ruff + mypy).
-pre-commit:
-	uv run pre-commit run --all-files
-
-# Run the test suite.
-test:
-	uv run pytest -q
