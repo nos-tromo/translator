@@ -57,19 +57,18 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.frontend
+      args:
+        VITE_DEFAULT_TARGET_LANGUAGE: ${DEFAULT_TARGET_LANGUAGE:-English}
     logging: *default-logging
     environment:
       <<: *no-proxy-env
-      BACKEND_URL: http://backend:8000
-      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
-      DEFAULT_TARGET_LANGUAGE: ${DEFAULT_TARGET_LANGUAGE:-English}
     env_file: *env-file
     networks:
       translator-net:
     depends_on:
       - backend
     expose:
-      - "8501"
+      - "80"
     restart: unless-stopped
 
 networks:
