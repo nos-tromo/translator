@@ -20,7 +20,7 @@ include make/common.mk
 
 .PHONY: help
 help:
-	@echo "translator — FastAPI backend + Streamlit frontend."
+	@echo "translator — FastAPI backend + React SPA (nginx)."
 	@echo
 	@echo "  make network    create the shared inference-net"
 	@echo "  make build      build backend + frontend images"
