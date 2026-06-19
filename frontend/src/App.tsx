@@ -7,7 +7,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <div className="min-h-full">
         <header className="border-b border-border px-6 py-4">
-          <h1 className="text-lg font-semibold">🌐 Translator</h1>
+          <h1 className="text-lg font-semibold">Translator</h1>
         </header>
         <main className="mx-auto max-w-5xl px-6 py-8">
           <TranslatePanel />
