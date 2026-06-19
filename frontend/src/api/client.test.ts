@@ -5,7 +5,7 @@ afterEach(() => vi.restoreAllMocks())
 
 function mockFetch(status: number, body: unknown) {
   const fn = vi.fn(
-    async () =>
+    async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify(body), {
         status,
         headers: { 'content-type': 'application/json' },
