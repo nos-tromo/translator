@@ -45,5 +45,15 @@ describe('apiPost', () => {
     expect(ri.method).toBe('POST')
     expect(ri.body).toBe(JSON.stringify({ text: 'Hello', target_lang: 'fr' }))
     expect(ri.headers).toMatchObject({ 'content-type': 'application/json' })
+    expect(ri.headers).not.toHaveProperty('X-Auth-User')
+  })
+
+  it('throws ApiError carrying status and detail on non-2xx', async () => {
+    mockFetch(422, { detail: 'invalid' })
+    await expect(apiPost('/translate', { text: '' })).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 422,
+      detail: 'invalid',
+    } satisfies Partial<ApiError>)
   })
 })
