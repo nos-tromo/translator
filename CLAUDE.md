@@ -64,7 +64,8 @@ translator/                       # the importable package
   app.py         Streamlit UI. Thin HTTP client; calls BACKEND_URL.
   log_cfg.py     Loguru setup (stderr only; container driver rotates).
   language_map.json
-                 Static ISO 639-1 → human-readable name map (~100 entries).
+                 Static ISO 639-1 → human-readable name map (~50 entries),
+                 mirroring Nextext's translation target-language list.
                  Loaded by both endpoints.
 ```
 

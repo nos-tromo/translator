@@ -9,7 +9,7 @@ A self-hosted translation service powered by [TranslateGemma](https://huggingfac
 | Backend | `translator/main.py` | FastAPI app — `POST /translate`, `GET /languages` |
 | Engine | `translator/engine.py` | `Translator` class — language detection, flag lookup, LLM call |
 | Frontend | `translator/app.py` | Streamlit UI for text and file translation |
-| Language map | `translator/language_map.json` | ~100 language codes → human-readable names |
+| Language map | `translator/language_map.json` | ~50 language codes → human-readable names |
 
 ## Prerequisites
 
