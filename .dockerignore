@@ -75,4 +75,11 @@ README.md
 .translator-version
 docker/
 
+# React frontend build exclusions
+frontend/node_modules
+**/*.tsbuildinfo
+
 # Exceptions
+!frontend/index.html
+!frontend/nginx/
+!frontend/src/lib/
