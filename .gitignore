@@ -46,3 +46,4 @@ docker-compose.override.yml
 # Exceptions
 # -----------------
 !scripts/bundle_images.sh
+!scripts/bundle-lib.sh
