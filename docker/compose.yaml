@@ -62,7 +62,6 @@ services:
     logging: *default-logging
     environment:
       <<: *no-proxy-env
-    env_file: *env-file
     networks:
       translator-net:
     depends_on:
