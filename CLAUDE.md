@@ -61,12 +61,11 @@ does not publish host ports). In pure local dev (`pnpm dev`) the SPA is on
 ```
 translator/                       # the importable package
   main.py        FastAPI app. Instantiates a single Translator at startup.
-                 Endpoints: POST /translate, GET /languages.
+                 Endpoints under /api/v1: POST /translate, GET /languages,
+                 GET /health.
   engine.py      Translator class. Wraps an OpenAI-compatible client to call
                  a TranslateGemma model. Uses langdetect for source detection,
                  pycountry/langcodes/emoji-country-flag for display metadata.
-                 (the React SPA lives in the sibling `frontend/` directory,
-                 not in this package — see below.)
   log_cfg.py     Loguru setup (stderr only; container driver rotates).
   language_map.json
                  Static ISO 639-1 → human-readable name map (~50 entries),
