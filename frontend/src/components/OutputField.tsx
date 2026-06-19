@@ -11,6 +11,7 @@ export function OutputField({ value, placeholder }: OutputFieldProps) {
   const [copied, setCopied] = useState(false)
 
   async function copy() {
+    if (!navigator.clipboard) return
     await navigator.clipboard.writeText(value)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1500)

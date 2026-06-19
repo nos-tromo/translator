@@ -82,4 +82,3 @@ frontend/node_modules
 # Exceptions
 !frontend/index.html
 !frontend/nginx/
-!frontend/src/lib/
