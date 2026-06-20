@@ -17,8 +17,7 @@ import json
 from pathlib import Path
 from typing import cast
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, FastAPI, HTTPException
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator
 
@@ -36,18 +35,9 @@ app = FastAPI(
     description="Translate text via an OpenAI-compatible inference endpoint.",
     version="1.0.0",
 )
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8501",  # Streamlit frontend (Docker)
-        "http://127.0.0.1:8501",  # Streamlit frontend alternative
-        "http://localhost:8000",  # FastAPI backend (dev)
-        "http://127.0.0.1:8000",  # FastAPI backend alternative (dev)
-    ],
-    allow_credentials=True,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
-)
+# Same-origin model: the SPA is served by nginx, which proxies /api to this
+# backend, so requests are never cross-origin and no CORS policy is needed.
+router = APIRouter(prefix="/api/v1")
 translator = Translator()
 
 
@@ -137,7 +127,7 @@ def _load_language_codes(
         raise
 
 
-@app.post(
+@router.post(
     "/translate",
     summary="Translate text",
     description="Translates input text to a target language using TranslateGemma via an OpenAI-compatible endpoint.",
@@ -188,7 +178,7 @@ def translate(req: TranslationRequest) -> TranslationResponse | None:
         raise HTTPException(status_code=500, detail="Translation failed.") from e
 
 
-@app.get(
+@router.get(
     "/languages",
     summary="List supported languages",
     description="Returns a list of supported TranslateGemma language codes with human-readable names, "
@@ -213,3 +203,22 @@ def get_languages() -> list[dict[str, str]]:
     except Exception as e:
         logger.error(f"Error on /languages endpoint: {e}")
         raise HTTPException(status_code=500, detail="Failed to load language list.") from e
+
+
+@router.get(
+    "/health",
+    summary="Health check",
+    description="Liveness probe returning the configured translation model id.",
+    tags=["Metadata"],
+)
+def health() -> dict[str, str]:
+    """Return a liveness payload with the configured model identifier.
+
+    Returns:
+        A dict with ``"status"`` fixed to ``"ok"`` and ``"model"`` set to the
+        engine's configured model id.
+    """
+    return {"status": "ok", "model": translator.model}
+
+
+app.include_router(router)

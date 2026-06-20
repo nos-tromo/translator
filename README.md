@@ -8,7 +8,7 @@ A self-hosted translation service powered by [TranslateGemma](https://huggingfac
 |---|---|---|
 | Backend | `translator/main.py` | FastAPI app — `POST /translate`, `GET /languages` |
 | Engine | `translator/engine.py` | `Translator` class — language detection, flag lookup, LLM call |
-| Frontend | `translator/app.py` | Streamlit UI for text and file translation |
+| Frontend | `frontend/` | React SPA (Vite + `@infra/ui`), served by nginx; speaks HTTP to the backend |
 | Language map | `translator/language_map.json` | ~50 language codes → human-readable names |
 
 ## Prerequisites
@@ -42,18 +42,18 @@ uv sync --group dev
 OPENAI_API_BASE=http://localhost:11434/v1 uv run uvicorn translator.main:app --reload
 # API docs → http://127.0.0.1:8000/docs
 
-# Frontend (Streamlit)
-uv run streamlit run translator/app.py
-# UI → http://localhost:8501
+# Frontend (React SPA) — in a second terminal
+cd frontend && pnpm install && pnpm dev
+# UI → http://localhost:5173 (Vite dev server proxies /api to the backend on :8000)
 ```
 
 ## Docker
 
 ```bash
-docker compose up --build
+make up-dev   # builds + starts backend and the React SPA, publishing host ports
 ```
 
-App → `http://localhost:8501`
+App → `http://localhost:${TRANSLATOR_HOST_PORT:-8501}`
 
 The compose file expects an external Docker network named `inference-net` (configurable via `INFERENCE_NETWORK`) with an Ollama container reachable as `ollama`.
 
@@ -66,7 +66,7 @@ Copy `.env.example` to `.env` and fill in your values.
 | `OPENAI_API_BASE` | Yes | — | Base URL of the OpenAI-compatible endpoint — must include `/v1` (e.g. `http://localhost:11434/v1`) |
 | `OPENAI_API_KEY` | No | `ollama` | API key (`ollama` works for local Ollama servers) |
 | `TRANSLATE_MODEL` | No | `translategemma:4b` | Model identifier |
-| `BACKEND_URL` | No | `http://localhost:8000` | Frontend → backend URL |
+| `DEFAULT_TARGET_LANGUAGE` | No | `English` | Build-time default target language, baked into the SPA via the `VITE_DEFAULT_TARGET_LANGUAGE` build arg |
 
 ## Tests
 

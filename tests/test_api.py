@@ -22,7 +22,7 @@ def test_get_languages_returns_list(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    r = client.get("/languages")
+    r = client.get("/api/v1/languages")
     assert r.status_code == 200
     data = r.json()
     assert isinstance(data, list)
@@ -35,7 +35,7 @@ def test_get_languages_entry_shape(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    r = client.get("/languages")
+    r = client.get("/api/v1/languages")
     for entry in r.json():
         assert "code" in entry
         assert "name" in entry
@@ -47,7 +47,7 @@ def test_get_languages_includes_english(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    r = client.get("/languages")
+    r = client.get("/api/v1/languages")
     codes = [lang["code"] for lang in r.json()]
     assert "en" in codes
 
@@ -59,7 +59,7 @@ def test_get_languages_returns_500_on_missing_file(client: TestClient) -> None:
         client: TestClient provided by the ``client`` fixture.
     """
     with patch("translator.main._load_language_codes", side_effect=FileNotFoundError):
-        r = client.get("/languages")
+        r = client.get("/api/v1/languages")
     assert r.status_code == 500
 
 
@@ -80,7 +80,7 @@ def test_translate_auto_detect(client: TestClient) -> None:
         }
         mock_t.translate.return_value = "Bonjour le monde"
 
-        r = client.post("/translate", json={"text": "Hello world", "target_lang": "fr"})
+        r = client.post("/api/v1/translate", json={"text": "Hello world", "target_lang": "fr"})
 
     assert r.status_code == 200
     data = r.json()
@@ -100,7 +100,7 @@ def test_translate_explicit_source_lang(client: TestClient) -> None:
         mock_t.translate.return_value = "Hola mundo"
 
         r = client.post(
-            "/translate",
+            "/api/v1/translate",
             json={"text": "Hello world", "target_lang": "es", "source_lang": "en"},
         )
 
@@ -124,7 +124,7 @@ def test_translate_calls_engine_with_correct_args(client: TestClient) -> None:
         }
         mock_t.translate.return_value = "Bonjour"
 
-        client.post("/translate", json={"text": "Hello", "target_lang": "fr"})
+        client.post("/api/v1/translate", json={"text": "Hello", "target_lang": "fr"})
 
     mock_t.translate.assert_called_once_with("Hello", "English", "en", "French", "fr")
 
@@ -143,7 +143,7 @@ def test_translate_returns_500_on_engine_error(client: TestClient) -> None:
         }
         mock_t.translate.side_effect = RuntimeError("Translation failed")
 
-        r = client.post("/translate", json={"text": "Hello", "target_lang": "fr"})
+        r = client.post("/api/v1/translate", json={"text": "Hello", "target_lang": "fr"})
 
     assert r.status_code == 500
 
@@ -154,7 +154,7 @@ def test_translate_missing_text_returns_422(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    r = client.post("/translate", json={"target_lang": "fr"})
+    r = client.post("/api/v1/translate", json={"target_lang": "fr"})
     assert r.status_code == 422
 
 
@@ -164,7 +164,7 @@ def test_translate_missing_target_lang_returns_422(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    r = client.post("/translate", json={"text": "Hello"})
+    r = client.post("/api/v1/translate", json={"text": "Hello"})
     assert r.status_code == 422
 
 
@@ -182,7 +182,7 @@ def test_translate_unknown_target_lang_falls_back_to_code(client: TestClient) ->
         }
         mock_t.translate.return_value = "some translation"
 
-        r = client.post("/translate", json={"text": "Hello", "target_lang": "xx"})
+        r = client.post("/api/v1/translate", json={"text": "Hello", "target_lang": "xx"})
 
     assert r.status_code == 200
     # target lang name falls back to the raw code "xx"
@@ -196,7 +196,7 @@ def test_translate_empty_text_returns_422(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    r = client.post("/translate", json={"text": "", "target_lang": "fr"})
+    r = client.post("/api/v1/translate", json={"text": "", "target_lang": "fr"})
     assert r.status_code == 422
 
 
@@ -206,7 +206,7 @@ def test_translate_whitespace_only_text_returns_422(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    r = client.post("/translate", json={"text": "   \t\n", "target_lang": "fr"})
+    r = client.post("/api/v1/translate", json={"text": "   \t\n", "target_lang": "fr"})
     assert r.status_code == 422
 
 
@@ -217,5 +217,32 @@ def test_translate_oversize_text_returns_422(client: TestClient) -> None:
         client: TestClient provided by the ``client`` fixture.
     """
     oversized = "a" * (MAX_TEXT_LENGTH + 1)
-    r = client.post("/translate", json={"text": oversized, "target_lang": "fr"})
+    r = client.post("/api/v1/translate", json={"text": oversized, "target_lang": "fr"})
     assert r.status_code == 422
+
+
+# ── GET /health ────────────────────────────────────────────────────────────────
+
+
+def test_health_returns_ok(client: TestClient) -> None:
+    """``GET /api/v1/health`` responds 200 with status ``ok`` and the model id.
+
+    Args:
+        client: TestClient provided by the ``client`` fixture.
+    """
+    r = client.get("/api/v1/health")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "ok"
+    assert isinstance(body["model"], str)
+    assert body["model"]
+
+
+def test_root_translate_path_is_gone(client: TestClient) -> None:
+    """The pre-migration root path ``POST /translate`` no longer exists (404).
+
+    Args:
+        client: TestClient provided by the ``client`` fixture.
+    """
+    r = client.post("/translate", json={"text": "Hello", "target_lang": "fr"})
+    assert r.status_code == 404

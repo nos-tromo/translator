@@ -1,0 +1,22 @@
+@import 'tailwindcss';
+@import '@infra/ui/theme.css';
+@source '../../node_modules/@infra/ui/dist';
+
+:root {
+  /* translator's single design-system knob; primary derives from this. */
+  --app-accent: hsl(217 91% 60%);
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}

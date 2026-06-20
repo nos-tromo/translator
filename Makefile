@@ -1,6 +1,6 @@
 ### translator — build-host helpers.
 ###
-### translator is a thin app: FastAPI backend + Streamlit frontend that
+### translator is a thin app: FastAPI backend + React SPA (nginx) frontend that
 ### call inference over the shared `inference-net`. It has no local GPU
 ### code and no persistent state of its own, so there are no
 ### `cpu`/`cuda` profiles and `docker compose down -v` is always safe.
@@ -20,7 +20,7 @@ include make/common.mk
 
 .PHONY: help
 help:
-	@echo "translator — FastAPI backend + Streamlit frontend."
+	@echo "translator — FastAPI backend + React SPA (nginx)."
 	@echo
 	@echo "  make network    create the shared inference-net"
 	@echo "  make build      build backend + frontend images"
