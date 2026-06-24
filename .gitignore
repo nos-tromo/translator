@@ -20,7 +20,6 @@
 **/.venv/
 **/.vscode/
 **/*.egg-info/
-**/.mypy_cache/
 **/.pytest_cache/
 **/.ruff_cache/
 **/*.egg-info/
