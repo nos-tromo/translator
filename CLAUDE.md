@@ -29,7 +29,7 @@ uv run uvicorn translator.main:app --reload     # FastAPI on :8000, docs at /doc
 # Backend tests / lint / types
 uv run pytest                                   # full suite
 uv run pytest tests/test_x.py::test_name        # single test
-uv run pre-commit run --all-files               # ruff + mypy
+uv run pre-commit run --all-files               # ruff + pyrefly
 
 # Frontend lint / types / tests / build (inside frontend/)
 cd frontend && pnpm lint && pnpm typecheck && pnpm test && pnpm build
