@@ -14,8 +14,6 @@
 
 REPO     := translator
 NETWORKS := inference-net
-UP_ENV   := DOCKER_BUILDKIT=1
-UP_FLAGS := --no-build
 include make/common.mk
 
 .PHONY: help
@@ -25,8 +23,9 @@ help:
 	@echo "  make network    create the shared inference-net"
 	@echo "  make build      build backend + frontend images"
 	@echo "  make bundle     ship images as a versioned .tar.gz (built locally)"
-	@echo "  make up         start backend + frontend (production shape, no host ports)"
-	@echo "  make up-dev     like 'up', but publishes backend + frontend ports on the host"
+	@echo "  make up         start backend + frontend, detached; no build (production shape, no host ports)"
+	@echo "  make up-dev     like 'up' + host ports; detached, no build (run 'make build' first)"
+	@echo "  make dev        build, then up-dev"
 	@echo "  make stop       stop containers (keep them)"
 	@echo "  make down       stop + remove containers"
 	@echo "  make logs       tail combined logs"
