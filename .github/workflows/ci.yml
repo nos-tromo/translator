@@ -24,5 +24,10 @@ jobs:
       python-versions: '["3.11"]'
       uv-sync-args: '--frozen --group dev'
       docker-build: true
+      frontend-build: true
+      frontend-dir: 'frontend'
+      frontend-lint: true
+      node-version: '20'
+      pnpm-version: '9.12.0'
       test-env: |
         OPENAI_API_BASE=http://test-host:11434/v1
