@@ -50,7 +50,7 @@ cd frontend && pnpm install && pnpm dev
 ## Docker
 
 ```bash
-make up-dev   # builds + starts backend and the React SPA, publishing host ports
+make dev   # build, then start backend and the React SPA detached, publishing host ports
 ```
 
 App → `http://localhost:${TRANSLATOR_HOST_PORT:-8501}`

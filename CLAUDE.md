@@ -38,8 +38,9 @@ cd frontend && pnpm lint && pnpm typecheck && pnpm test && pnpm build
 make help                            # list build-host targets
 make network                         # one-time: create the external inference-net
 make build                           # build backend + frontend images
-make up                              # start the stack (production shape — base docker/compose.yaml only)
-make up-dev                          # like 'up', but publishes backend + frontend ports on the host
+make up                              # start the stack, detached; no build (production shape — base docker/compose.yaml)
+make up-dev                          # like 'up' + host ports; detached, no build (run 'make build' first)
+make dev                             # build, then up-dev (host ports)
 make stop                            # stop containers (keep them)
 make down                            # stop + remove containers (safe; no state volumes)
 make logs                            # tail combined logs
