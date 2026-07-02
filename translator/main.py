@@ -14,6 +14,8 @@ starts.
 """
 
 import json
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import cast
 
@@ -30,10 +32,17 @@ MAX_TEXT_LENGTH = 20_000
 
 # === FastAPI Setup ===
 
+try:
+    # Single source of truth: the installed package version (derives from
+    # pyproject, kept in sync with the release git tag at release time).
+    _APP_VERSION = _pkg_version("translator")
+except PackageNotFoundError:  # running from source without an installed dist
+    _APP_VERSION = "0+unknown"
+
 app = FastAPI(
     title="Translator",
     description="Translate text via an OpenAI-compatible inference endpoint.",
-    version="1.0.0",
+    version=_APP_VERSION,
 )
 # Same-origin model: the SPA is served by nginx, which proxies /api to this
 # backend, so requests are never cross-origin and no CORS policy is needed.
