@@ -214,6 +214,17 @@ def get_languages() -> list[dict[str, str]]:
         raise HTTPException(status_code=500, detail="Failed to load language list.") from e
 
 
+@router.get("/version", summary="App version", tags=["Metadata"])
+def get_version() -> dict[str, str]:
+    """Return the running app version (unauthenticated).
+
+    Returns:
+        A dict with a single ``"version"`` key set to the installed package
+        version (or ``"0+unknown"`` when running uninstalled from source).
+    """
+    return {"version": _APP_VERSION}
+
+
 @router.get(
     "/health",
     summary="Health check",
