@@ -44,7 +44,8 @@ make dev                             # build, then up-dev (host ports)
 make stop                            # stop containers (keep them)
 make down                            # stop + remove containers (safe; no state volumes)
 make logs                            # tail combined logs
-make bundle                          # ship images as a versioned .tar.gz
+make bundle                          # ship images as a .tar.gz built from the latest release tag (production)
+make bundle-dev                      # ship images as a .tar.gz of the current working tree (dev/soak)
 ```
 
 The SPA is at `http://localhost:${TRANSLATOR_HOST_PORT:-8501}` (dev overlay
