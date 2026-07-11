@@ -50,6 +50,17 @@ services:
           - translator-backend
     expose:
       - "8000"
+    healthcheck:
+      # Liveness: uvicorn serving /api/v1/health is exactly when the frontend
+      # can safely proxy. python3 urllib avoids adding curl to the image;
+      # start_interval marks it healthy ~5s after boot (Docker >=25) instead
+      # of at the first 30s probe.
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 3s
     restart: unless-stopped
 
   frontend:
@@ -65,7 +76,8 @@ services:
     networks:
       translator-net:
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     expose:
       - "80"
     restart: unless-stopped
