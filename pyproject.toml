@@ -15,10 +15,10 @@ dependencies = [
     "langcodes[data]>=3.5.1",
     "langdetect>=1.0.9",
     "loguru>=0.7.3",
-    "openai>=2.44.0",
+    "openai>=2.45.0",
     "pycountry>=26.2.16",
     "pydantic>=2.13.4",
-    "uvicorn>=0.50.0",
+    "uvicorn>=0.51.0",
 ]
 
 [project.urls]
