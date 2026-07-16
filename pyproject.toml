@@ -1,6 +1,6 @@
 [project]
 name = "translator"
-version = "1.0.2"
+version = "1.0.3"
 description = "Simple translation tool."
 authors = [
   { name = "nos-tromo" }
