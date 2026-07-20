@@ -16,7 +16,7 @@
 - Theme tokens (from `@infra/ui/theme.css`, Tailwind v4 `@theme`): colors `background foreground muted muted-foreground border accent danger primary primary-foreground`; the only per-app knob is `--app-accent` (falls back to blue). Use token utilities (`bg-background`, `text-foreground`, `border-border`, `bg-primary`, …).
 - No auth / `X-Auth-User` header anywhere (translator owns no data).
 - Airgap: deps baked at image-build via `pnpm install --frozen-lockfile`; nothing fetched at runtime.
-- Conventional Commits, frequent commits (one per task minimum). Run `cd /Users/himarc/dev/nos-tromo/infra/translator` before any `git`/`make`; run `cd frontend` before any pnpm command.
+- Conventional Commits, frequent commits (one per task minimum). Run `git`/`make` from the repo root; run `cd frontend` before any pnpm command.
 
 ---
 
@@ -69,7 +69,7 @@ def test_root_translate_path_is_gone(client: TestClient) -> None:
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator && OPENAI_API_BASE=http://test-host:11434/v1 uv run pytest tests/test_api.py -q`
+Run: `OPENAI_API_BASE=http://test-host:11434/v1 uv run pytest tests/test_api.py -q`
 Expected: FAIL — the `/api/v1/...` calls 404 (routes still at root) and `test_health_returns_ok` 404s.
 
 - [ ] **Step 3: Add the router + health endpoint and remove CORS in `translator/main.py`**
@@ -135,18 +135,17 @@ app.include_router(router)
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator && OPENAI_API_BASE=http://test-host:11434/v1 uv run pytest tests/test_api.py -q`
+Run: `OPENAI_API_BASE=http://test-host:11434/v1 uv run pytest tests/test_api.py -q`
 Expected: PASS (all repointed tests + 2 new health/404 tests).
 
 - [ ] **Step 5: Lint + type-check the backend change**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator && uv run ruff check translator/main.py tests/test_api.py && uv run mypy translator/main.py`
+Run: `uv run ruff check translator/main.py tests/test_api.py && uv run mypy translator/main.py`
 Expected: no errors.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add translator/main.py tests/test_api.py
 git commit -m "feat(api): move routes under /api/v1, add /health, drop CORS"
 ```
@@ -327,7 +326,6 @@ export default function App() {
 - [ ] **Step 9: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add frontend/package.json frontend/.gitignore frontend/index.html \
   frontend/tsconfig.json frontend/tsconfig.node.json \
   frontend/src/vite-env.d.ts frontend/src/main.tsx frontend/src/App.tsx
@@ -379,18 +377,17 @@ import '@testing-library/jest-dom/vitest'
 
 - [ ] **Step 3: Install dependencies (generates the lockfile)**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm install`
+Run: `cd frontend && pnpm install`
 Expected: completes; creates `frontend/pnpm-lock.yaml` and `frontend/node_modules/`. `@infra/ui` resolves from the GitHub tarball.
 
 - [ ] **Step 4: Type-check the skeleton**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm typecheck`
+Run: `cd frontend && pnpm typecheck`
 Expected: PASS (CSS imports in `main.tsx` are accepted via `vite/client` ambient types even though `globals.css` arrives in Task 4).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add frontend/vite.config.ts frontend/src/test/setup.ts frontend/pnpm-lock.yaml
 git commit -m "chore(frontend): vite + vitest config and lockfile"
 ```
@@ -472,13 +469,12 @@ export { cn } from '@infra/ui'
 
 - [ ] **Step 5: Lint, type-check, and build**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm lint && pnpm typecheck && pnpm build`
+Run: `cd frontend && pnpm lint && pnpm typecheck && pnpm build`
 Expected: all PASS; `vite build` writes `frontend/dist/` (the placeholder App compiles, Tailwind resolves `@infra/ui` tokens).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add frontend/postcss.config.js frontend/eslint.config.js \
   frontend/src/styles/globals.css frontend/src/lib/cn.ts
 git commit -m "chore(frontend): tailwind v4, eslint, @infra/ui theme, cn"
@@ -585,7 +581,7 @@ describe('apiPost', () => {
 
 - [ ] **Step 2b: Run the test to verify it fails**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm test -- client`
+Run: `cd frontend && pnpm test -- client`
 Expected: FAIL — `Cannot find module './client'`.
 
 - [ ] **Step 3: Create `frontend/src/api/client.ts`**
@@ -662,13 +658,12 @@ export const queryClient = new QueryClient({
 
 - [ ] **Step 5: Run the test to verify it passes**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm test -- client`
+Run: `cd frontend && pnpm test -- client`
 Expected: PASS (3 tests).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add frontend/src/api/types.ts frontend/src/api/client.ts \
   frontend/src/api/queryClient.ts frontend/src/api/client.test.ts
 git commit -m "feat(frontend): typed fetch client + query client (no auth header)"
@@ -731,7 +726,7 @@ describe('translator api', () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm test -- translator`
+Run: `cd frontend && pnpm test -- translator`
 Expected: FAIL — `Cannot find module './translator'`.
 
 - [ ] **Step 3: Create `frontend/src/api/translator.ts`**
@@ -751,7 +746,7 @@ export function translate(req: TranslateRequest, signal?: AbortSignal): Promise<
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm test -- translator`
+Run: `cd frontend && pnpm test -- translator`
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Create `frontend/src/hooks/useLanguages.ts`**
@@ -789,11 +784,10 @@ export function useTranslate() {
 
 - [ ] **Step 7: Type-check then commit**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm typecheck`
+Run: `cd frontend && pnpm typecheck`
 Expected: PASS.
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add frontend/src/api/translator.ts frontend/src/api/translator.test.ts \
   frontend/src/hooks/useLanguages.ts frontend/src/hooks/useTranslate.ts
 git commit -m "feat(frontend): translator api calls + languages/translate hooks"
@@ -852,7 +846,7 @@ describe('LanguageSelect', () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm test -- LanguageSelect`
+Run: `cd frontend && pnpm test -- LanguageSelect`
 Expected: FAIL — `Cannot find module './LanguageSelect'`.
 
 - [ ] **Step 3: Create `frontend/src/components/LanguageSelect.tsx`**
@@ -955,13 +949,12 @@ export function DetectedLanguageBanner({ name, flag, auto }: DetectedLanguageBan
 
 - [ ] **Step 6: Run the test to verify it passes**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm test -- LanguageSelect`
+Run: `cd frontend && pnpm test -- LanguageSelect`
 Expected: PASS (2 tests).
 
 - [ ] **Step 7: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add frontend/src/components/LanguageSelect.tsx frontend/src/components/LanguageSelect.test.tsx \
   frontend/src/components/FileTextInput.tsx frontend/src/components/DetectedLanguageBanner.tsx
 git commit -m "feat(frontend): language selects, .txt input, detected-language banner"
@@ -1009,7 +1002,7 @@ describe('OutputField', () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm test -- OutputField`
+Run: `cd frontend && pnpm test -- OutputField`
 Expected: FAIL — `Cannot find module './OutputField'`.
 
 - [ ] **Step 3: Create `frontend/src/components/OutputField.tsx`**
@@ -1062,13 +1055,12 @@ export function OutputField({ value, placeholder }: OutputFieldProps) {
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm test -- OutputField`
+Run: `cd frontend && pnpm test -- OutputField`
 Expected: PASS (2 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add frontend/src/components/OutputField.tsx frontend/src/components/OutputField.test.tsx
 git commit -m "feat(frontend): output field with hover-reveal copy button"
 ```
@@ -1155,7 +1147,7 @@ describe('TranslatePanel', () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm test -- TranslatePanel`
+Run: `cd frontend && pnpm test -- TranslatePanel`
 Expected: FAIL — `Cannot find module './TranslatePanel'`.
 
 - [ ] **Step 3: Create `frontend/src/components/TranslatePanel.tsx`**
@@ -1292,24 +1284,23 @@ export default function App() {
 
 - [ ] **Step 5: Run the test to verify it passes**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm test -- TranslatePanel`
+Run: `cd frontend && pnpm test -- TranslatePanel`
 Expected: PASS.
 
 - [ ] **Step 6: Full frontend gate — lint, typecheck, all tests, build**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm lint && pnpm typecheck && pnpm test && pnpm build`
+Run: `cd frontend && pnpm lint && pnpm typecheck && pnpm test && pnpm build`
 Expected: all green; `frontend/dist/` written.
 
 - [ ] **Step 7: Manual end-to-end check against the running backend**
 
-Run (terminal A): `cd /Users/himarc/dev/nos-tromo/infra/translator && OPENAI_API_BASE=<your-endpoint>/v1 uv run uvicorn translator.main:app --reload`
-Run (terminal B): `cd /Users/himarc/dev/nos-tromo/infra/translator/frontend && pnpm dev`
+Run (terminal A): `OPENAI_API_BASE=<your-endpoint>/v1 uv run uvicorn translator.main:app --reload`
+Run (terminal B): `cd frontend && pnpm dev`
 Open `http://localhost:5173`. Expected: language dropdowns populate (proxy forwarded `/api/v1/languages`), a translation round-trips and renders, the detected-language banner appears, and the copy button reveals on hover and copies.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add frontend/src/components/TranslatePanel.tsx \
   frontend/src/components/TranslatePanel.test.tsx frontend/src/App.tsx
 git commit -m "feat(frontend): translate panel wired end-to-end"
@@ -1371,7 +1362,6 @@ server {
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add frontend/nginx/security-headers.conf frontend/nginx/default.conf
 git commit -m "feat(frontend): nginx same-origin /api proxy + SPA fallback"
 ```
@@ -1410,13 +1400,12 @@ EXPOSE 80
 
 - [ ] **Step 2: Build the image to verify the Dockerfile**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator && DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile.frontend -t translator-frontend:dev .`
+Run: `DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile.frontend -t translator-frontend:dev .`
 Expected: build succeeds; final image is nginx-based serving the built SPA.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add docker/Dockerfile.frontend
 git commit -m "feat(docker): node→nginx frontend image replacing Streamlit"
 ```
@@ -1462,13 +1451,12 @@ git commit -m "feat(docker): node→nginx frontend image replacing Streamlit"
 
 - [ ] **Step 3: Validate compose interpolation**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator && docker compose -f docker/compose.yaml -f docker/compose.override.yaml config | sed -n '/frontend:/,/restart/p'`
+Run: `docker compose -f docker/compose.yaml -f docker/compose.override.yaml config | sed -n '/frontend:/,/restart/p'`
 Expected: `frontend` resolves with the build arg, `expose: 80`, and the `${TRANSLATOR_HOST_PORT:-8501}:80` mapping; no `BACKEND_URL`/`STREAMLIT_*`/`DEFAULT_TARGET_LANGUAGE` env remain.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add docker/compose.yaml docker/compose.override.yaml
 git commit -m "feat(docker): point compose frontend at the React/nginx image"
 ```
@@ -1494,18 +1482,17 @@ to:
 
 - [ ] **Step 2: Build both images via the make workflow**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator && make build`
+Run: `make build`
 Expected: builds `translator-backend` and `translator-frontend` (React/nginx) without error.
 
 - [ ] **Step 3: Smoke test the dev stack**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator && make network && OPENAI_API_BASE=<your-endpoint>/v1 make up-dev`
+Run: `make network && OPENAI_API_BASE=<your-endpoint>/v1 make up-dev`
 Open `http://localhost:8501`. Expected: the SPA loads, language dropdowns populate, and a translation round-trips through nginx → `backend:8000` (proving the same-origin proxy). Then `make down`.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add Makefile
 git commit -m "docs(make): describe the React SPA frontend"
 ```

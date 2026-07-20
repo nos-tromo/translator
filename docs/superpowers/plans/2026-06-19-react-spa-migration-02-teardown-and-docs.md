@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Run `cd /Users/himarc/dev/nos-tromo/infra/translator` before any `git`/`uv`/`make`.
+- Run `git`/`uv`/`make` from the repo root.
 - **Prerequisite:** Plan 01 is fully merged/complete (the React SPA is the wired frontend). Do not start otherwise — this plan deletes the Streamlit UI.
 - Backend imports none of `streamlit`/`requests`/`types-requests` (verified: used only by `translator/app.py`).
 - Conventional Commits; commit per task.
@@ -26,7 +26,7 @@
 
 - [ ] **Step 1: Delete the Streamlit app**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator && git rm translator/app.py`
+Run: `git rm translator/app.py`
 Expected: `app.py` staged for deletion.
 
 - [ ] **Step 2: Remove the three Streamlit-only base dependencies in `pyproject.toml`**
@@ -71,21 +71,20 @@ The `[dependency-groups]` section must retain only the `dev` group.
 
 - [ ] **Step 4: Refresh the lockfile**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator && uv lock`
+Run: `uv lock`
 Expected: `uv.lock` updates; `streamlit`, `requests`, `types-requests` (and their now-orphaned transitive deps) are dropped.
 
 - [ ] **Step 5: Verify the backend is intact and nothing referenced the removed deps**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator && grep -rnE "^[[:space:]]*(import|from)[[:space:]]+(streamlit|requests)\b" translator || echo "NO_STREAMLIT_OR_REQUESTS_IMPORTS"`
+Run: `grep -rnE "^[[:space:]]*(import|from)[[:space:]]+(streamlit|requests)\b" translator || echo "NO_STREAMLIT_OR_REQUESTS_IMPORTS"`
 Expected: `NO_STREAMLIT_OR_REQUESTS_IMPORTS` (matches import statements only — the real failure mode — so prose containing the word "request(s)" doesn't trip it).
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator && OPENAI_API_BASE=http://test-host:11434/v1 uv run pytest -q && uv run mypy translator`
+Run: `OPENAI_API_BASE=http://test-host:11434/v1 uv run pytest -q && uv run mypy translator`
 Expected: full suite PASS; mypy clean.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add translator/app.py pyproject.toml uv.lock
 git commit -m "chore: remove Streamlit frontend and its python deps"
 ```
@@ -171,13 +170,12 @@ with:
 
 - [ ] **Step 5: Verify there is no remaining Streamlit reference**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator && grep -niE "streamlit|app\.py|BACKEND_URL" README.md || echo "README_CLEAN"`
+Run: `grep -niE "streamlit|app\.py|BACKEND_URL" README.md || echo "README_CLEAN"`
 Expected: `README_CLEAN`.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add README.md
 git commit -m "docs(readme): describe the React SPA frontend"
 ```
@@ -374,13 +372,12 @@ with:
 
 - [ ] **Step 9: Verify no stale Streamlit references remain in repo docs**
 
-Run: `cd /Users/himarc/dev/nos-tromo/infra/translator && grep -rniE "streamlit|BACKEND_URL" CLAUDE.md .env.example || echo "DOCS_CLEAN"`
+Run: `grep -rniE "streamlit|BACKEND_URL" CLAUDE.md .env.example || echo "DOCS_CLEAN"`
 Expected: `DOCS_CLEAN`.
 
 - [ ] **Step 10: Commit**
 
 ```bash
-cd /Users/himarc/dev/nos-tromo/infra/translator
 git add CLAUDE.md .env.example
 git commit -m "docs(claude): document the React SPA, /api/v1, and same-origin model"
 ```
@@ -390,13 +387,13 @@ git commit -m "docs(claude): document the React SPA, /api/v1, and same-origin mo
 ### Task 4: Flag the out-of-repo federation doc (no commit)
 
 **Files:**
-- Modify (out-of-repo, optional): `/Users/himarc/dev/nos-tromo/infra/CLAUDE.md`
+- Modify (out-of-repo, optional): `../CLAUDE.md`
 
 > `infra/` is a local workspace, **not a git repo** — this edit is not committed anywhere. Do it so the federation overview stays accurate, or hand it to whoever owns the workspace doc.
 
 - [ ] **Step 1: Update the translator stack descriptions in `infra/CLAUDE.md`**
 
-In `/Users/himarc/dev/nos-tromo/infra/CLAUDE.md`, in the "eight projects" table, change the translator row's Stack from `FastAPI + Streamlit` to `FastAPI + React SPA`. In the "Conventions shared across the Python apps" section, the sentence "chorus, Nextext, and translator use a Streamlit UI; docint a React SPA" is now stale — update it to reflect that translator and Nextext use the React/`@infra/ui` SPA (chorus remains Streamlit).
+In `../CLAUDE.md`, in the "eight projects" table, change the translator row's Stack from `FastAPI + Streamlit` to `FastAPI + React SPA`. In the "Conventions shared across the Python apps" section, the sentence "chorus, Nextext, and translator use a Streamlit UI; docint a React SPA" is now stale — update it to reflect that translator and Nextext use the React/`@infra/ui` SPA (chorus remains Streamlit).
 
 - [ ] **Step 2: (No commit — `infra/` is not a repository.)**
 
