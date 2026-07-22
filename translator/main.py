@@ -21,6 +21,7 @@ from typing import cast
 
 from fastapi import APIRouter, FastAPI, HTTPException
 from loguru import logger
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field, field_validator
 
 from translator.engine import Translator
@@ -48,6 +49,11 @@ app = FastAPI(
 # backend, so requests are never cross-origin and no CORS policy is needed.
 router = APIRouter(prefix="/api/v1")
 translator = Translator()
+
+# Aggregate-only request metrics (method, path template, status, latency) for
+# the obs-plane Prometheus scrape target. No request/response bodies — so no
+# translation text — ever reach a metric label or value.
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 
 class TranslationRequest(BaseModel):

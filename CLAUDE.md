@@ -91,6 +91,11 @@ translator/                       # the importable package
                  Loaded by both endpoints.
 ```
 
+`main.py` also wires `prometheus-fastapi-instrumentator` unconditionally at
+app creation, exposing aggregate HTTP metrics (no translation content) at
+`GET /metrics` (unauthenticated, excluded from the OpenAPI schema) for the
+`obs-plane` federation member to scrape.
+
 The frontend (`frontend/`, a separate Vite/React project) never imports
 `engine` or any backend module — it speaks HTTP to `/api/v1` only.
 
