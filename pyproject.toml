@@ -16,6 +16,7 @@ dependencies = [
     "langdetect>=1.0.9",
     "loguru>=0.7.3",
     "openai>=2.46.0",
+    "prometheus-fastapi-instrumentator>=8.0.2",
     "pycountry>=26.2.16",
     "pydantic>=2.13.4",
     "uvicorn>=0.51.0",
