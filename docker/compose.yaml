@@ -75,6 +75,11 @@ services:
       <<: *no-proxy-env
     networks:
       translator-net:
+        aliases:
+          - frontend
+      edge-net:
+        aliases:
+          - translator-frontend
     depends_on:
       backend:
         condition: service_healthy
@@ -87,3 +92,6 @@ networks:
   inference-net:
     external: true
     name: ${INFERENCE_NETWORK:-inference-net}
+  edge-net:
+    external: true
+    name: ${EDGE_NET:-edge-net}

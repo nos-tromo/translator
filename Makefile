@@ -13,7 +13,7 @@
 .DEFAULT_GOAL := help
 
 REPO     := translator
-NETWORKS := inference-net
+NETWORKS := inference-net edge-net
 include make/common.mk
 
 .PHONY: help
