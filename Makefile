@@ -22,7 +22,8 @@ help:
 	@echo
 	@echo "  make network    create the shared inference-net"
 	@echo "  make build      build backend + frontend images"
-	@echo "  make bundle     ship images as a versioned .tar.gz (built locally)"
+	@echo "  make bundle     ship images as a versioned .tar.gz (latest annotated release tag)"
+	@echo "  make bundle-dev like 'bundle', but from the current working tree (dev/soak)"
 	@echo "  make up         start backend + frontend, detached; no build (production shape, no host ports)"
 	@echo "  make up-dev     like 'up' + host ports; detached, no build (run 'make build' first)"
 	@echo "  make dev        build, then up-dev"
@@ -30,4 +31,5 @@ help:
 	@echo "  make down       stop + remove containers"
 	@echo "  make logs       tail combined logs"
 	@echo "  make pre-commit run pre-commit hooks (ruff + pyrefly)"
+	@echo "  make verify     pre-push gate: pre-commit + frontend lint/build; mirrors CI's lint gate"
 	@echo "  make test       run pytest"
