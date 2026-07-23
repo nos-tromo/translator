@@ -144,3 +144,9 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
 - **No volumes at all.** The compose project declares none — logs go to
   the container logging driver — so `make down` (and even
   `docker compose down -v`) is always safe.
+- **Canonical sub-path `/translator/`.** The SPA is built with Vite `base:
+  '/translator/'`; the frontend's own nginx strips that prefix so its
+  root-anchored locations apply unchanged, and direct root access 302s to
+  `/translator/`. The frontend joins the external `edge-net` as
+  `translator-frontend` — the edge-plane gateway is the sole production
+  entry point and supplies an `X-Auth-User` header, which this app ignores.

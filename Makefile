@@ -13,14 +13,14 @@
 .DEFAULT_GOAL := help
 
 REPO     := translator
-NETWORKS := inference-net
+NETWORKS := inference-net edge-net
 include make/common.mk
 
 .PHONY: help
 help:
 	@echo "translator — FastAPI backend + React SPA (nginx)."
 	@echo
-	@echo "  make network    create the shared inference-net"
+	@echo "  make network    create the external inference-net + edge-net"
 	@echo "  make build      build backend + frontend images"
 	@echo "  make bundle     ship images as a versioned .tar.gz (latest annotated release tag)"
 	@echo "  make bundle-dev like 'bundle', but from the current working tree (dev/soak)"

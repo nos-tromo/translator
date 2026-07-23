@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, apiGet, apiPost } from './client'
+import { ApiError, apiBase, apiGet, apiPost } from './client'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -55,5 +55,14 @@ describe('apiPost', () => {
       status: 422,
       detail: 'invalid',
     } satisfies Partial<ApiError>)
+  })
+})
+
+describe('apiBase', () => {
+  it('derives the API base from a sub-path BASE_URL', () => {
+    expect(apiBase('/translator/')).toBe('/translator/api/v1')
+  })
+  it('falls back to root for BASE_URL "/"', () => {
+    expect(apiBase('/')).toBe('/api/v1')
   })
 })
