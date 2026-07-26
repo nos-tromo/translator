@@ -10,6 +10,7 @@ conditions.
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from pytest import MonkeyPatch
 
 from translator.main import MAX_TEXT_LENGTH
 
@@ -251,7 +252,7 @@ def test_root_translate_path_is_gone(client: TestClient) -> None:
 # ── GET /config ────────────────────────────────────────────────────────────────
 
 
-def test_get_config_defaults_to_english(client: TestClient, monkeypatch) -> None:
+def test_get_config_defaults_to_english(client: TestClient, monkeypatch: MonkeyPatch) -> None:
     """Unset RESPONSE_LANGUAGE serves the English UI."""
     monkeypatch.delenv("RESPONSE_LANGUAGE", raising=False)
     response = client.get("/api/v1/config")
@@ -259,13 +260,13 @@ def test_get_config_defaults_to_english(client: TestClient, monkeypatch) -> None
     assert response.json() == {"language": "en"}
 
 
-def test_get_config_german(client: TestClient, monkeypatch) -> None:
+def test_get_config_german(client: TestClient, monkeypatch: MonkeyPatch) -> None:
     """RESPONSE_LANGUAGE=de serves the German UI."""
     monkeypatch.setenv("RESPONSE_LANGUAGE", "de")
     assert client.get("/api/v1/config").json() == {"language": "de"}
 
 
-def test_get_config_unknown_value_falls_back(client: TestClient, monkeypatch) -> None:
+def test_get_config_unknown_value_falls_back(client: TestClient, monkeypatch: MonkeyPatch) -> None:
     """A typo can never break bring-up — unknown values fall back to en."""
     monkeypatch.setenv("RESPONSE_LANGUAGE", "klingon")
     assert client.get("/api/v1/config").json() == {"language": "en"}

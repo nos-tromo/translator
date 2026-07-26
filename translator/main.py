@@ -49,11 +49,10 @@ def load_ui_language() -> str:
         return "en"
     candidate = raw.strip().lower()
     if candidate not in SUPPORTED_UI_LANGUAGES:
-        logger.warning(
-            f"Unknown RESPONSE_LANGUAGE value supplied; falling back to 'en' (got: {raw!r})"
-        )
+        logger.warning(f"Unknown RESPONSE_LANGUAGE value supplied; falling back to 'en' (got: {raw!r})")
         return "en"
     return candidate
+
 
 # === FastAPI Setup ===
 
