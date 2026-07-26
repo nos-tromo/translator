@@ -35,17 +35,25 @@ MAX_TEXT_LENGTH = 20_000
 SUPPORTED_UI_LANGUAGES = ("en", "de")
 
 
-def load_ui_language(default: str = "en") -> str:
+def load_ui_language() -> str:
     """Resolve the SPA UI language from ``RESPONSE_LANGUAGE``.
 
     Uniform federation variable (same name in every nos-tromo repo). It
     controls only the UI locale — the translation *target* stays a
     per-request choice and is unaffected. Unknown values fall back to
-    ``default`` so a typo cannot break bring-up.
+    ``en`` so a typo cannot break bring-up; a warning is logged when an
+    invalid value is supplied.
     """
     raw = os.getenv("RESPONSE_LANGUAGE")
-    candidate = (raw if raw is not None else default).strip().lower()
-    return candidate if candidate in SUPPORTED_UI_LANGUAGES else "en"
+    if raw is None:
+        return "en"
+    candidate = raw.strip().lower()
+    if candidate not in SUPPORTED_UI_LANGUAGES:
+        logger.warning(
+            f"Unknown RESPONSE_LANGUAGE value supplied; falling back to 'en' (got: {raw!r})"
+        )
+        return "en"
+    return candidate
 
 # === FastAPI Setup ===
 
