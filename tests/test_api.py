@@ -246,3 +246,26 @@ def test_root_translate_path_is_gone(client: TestClient) -> None:
     """
     r = client.post("/translate", json={"text": "Hello", "target_lang": "fr"})
     assert r.status_code == 404
+
+
+# ── GET /config ────────────────────────────────────────────────────────────────
+
+
+def test_get_config_defaults_to_english(client: TestClient, monkeypatch) -> None:
+    """Unset RESPONSE_LANGUAGE serves the English UI."""
+    monkeypatch.delenv("RESPONSE_LANGUAGE", raising=False)
+    response = client.get("/api/v1/config")
+    assert response.status_code == 200
+    assert response.json() == {"language": "en"}
+
+
+def test_get_config_german(client: TestClient, monkeypatch) -> None:
+    """RESPONSE_LANGUAGE=de serves the German UI."""
+    monkeypatch.setenv("RESPONSE_LANGUAGE", "de")
+    assert client.get("/api/v1/config").json() == {"language": "de"}
+
+
+def test_get_config_unknown_value_falls_back(client: TestClient, monkeypatch) -> None:
+    """A typo can never break bring-up — unknown values fall back to en."""
+    monkeypatch.setenv("RESPONSE_LANGUAGE", "klingon")
+    assert client.get("/api/v1/config").json() == {"language": "en"}

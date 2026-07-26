@@ -40,6 +40,9 @@ services:
       OPENAI_API_BASE: ${OPENAI_API_BASE}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-dummy}
       TRANSLATE_MODEL: ${TRANSLATE_MODEL:-google/translate-gemma-2b-it}
+      # Uniform federation UI-language switch (en|de, default en). UI only —
+      # the translation target stays a per-request choice.
+      RESPONSE_LANGUAGE: ${RESPONSE_LANGUAGE:-en}
     env_file: *env-file
     networks:
       translator-net:

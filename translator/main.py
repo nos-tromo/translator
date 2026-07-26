@@ -14,6 +14,7 @@ starts.
 """
 
 import json
+import os
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
@@ -30,6 +31,21 @@ from translator.log_cfg import setup_logger
 setup_logger()
 
 MAX_TEXT_LENGTH = 20_000
+
+SUPPORTED_UI_LANGUAGES = ("en", "de")
+
+
+def load_ui_language(default: str = "en") -> str:
+    """Resolve the SPA UI language from ``RESPONSE_LANGUAGE``.
+
+    Uniform federation variable (same name in every nos-tromo repo). It
+    controls only the UI locale — the translation *target* stays a
+    per-request choice and is unaffected. Unknown values fall back to
+    ``default`` so a typo cannot break bring-up.
+    """
+    raw = os.getenv("RESPONSE_LANGUAGE")
+    candidate = (raw if raw is not None else default).strip().lower()
+    return candidate if candidate in SUPPORTED_UI_LANGUAGES else "en"
 
 # === FastAPI Setup ===
 
@@ -113,6 +129,12 @@ class TranslationResponse(BaseModel):
 
     translation: str
     detected_language: DetectedLanguage
+
+
+class ConfigResponse(BaseModel):
+    """Client bootstrap config for the SPA."""
+
+    language: str
 
 
 def _load_language_codes(
@@ -229,6 +251,12 @@ def get_version() -> dict[str, str]:
         version (or ``"0+unknown"`` when running uninstalled from source).
     """
     return {"version": _APP_VERSION}
+
+
+@router.get("/config")
+def get_config() -> ConfigResponse:
+    """Return the SPA bootstrap config (UI language). Unauthenticated, like /health."""
+    return ConfigResponse(language=load_ui_language())
 
 
 @router.get(
