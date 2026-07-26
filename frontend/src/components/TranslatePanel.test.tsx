@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import { TranslatePanel } from './TranslatePanel'
+import { LanguageContext } from '../i18n/LanguageContext'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -11,6 +12,17 @@ function renderPanel() {
   return render(
     <QueryClientProvider client={qc}>
       <TranslatePanel />
+    </QueryClientProvider>,
+  )
+}
+
+function renderPanelInLanguage(lang: 'en' | 'de') {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={qc}>
+      <LanguageContext.Provider value={lang}>
+        <TranslatePanel />
+      </LanguageContext.Provider>
     </QueryClientProvider>,
   )
 }
@@ -84,5 +96,24 @@ describe('TranslatePanel', () => {
     const postCall = fetchFn.mock.calls.find(([u]) => String(u).endsWith('/translate'))!
     const body = JSON.parse((postCall[1] as RequestInit).body as string)
     expect(body).toMatchObject({ text: 'Hello world', target_lang: 'fr' })
+  })
+
+  it('renders German chrome when language is de', async () => {
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/languages')) {
+        return jsonResponse([
+          { code: 'en', name: 'English' },
+          { code: 'fr', name: 'French' },
+        ])
+      }
+      return jsonResponse({})
+    })
+    vi.stubGlobal('fetch', fetchFn)
+
+    renderPanelInLanguage('de')
+
+    await screen.findByLabelText('Zu übersetzender Text')
+    expect(screen.getByRole('button', { name: 'Übersetzen' })).toBeInTheDocument()
   })
 })
