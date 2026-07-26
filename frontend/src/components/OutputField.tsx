@@ -20,6 +20,7 @@ export function OutputField({ value, placeholder }: OutputFieldProps) {
         <CopyButton
           text={value}
           label={t('output.copy_translation')}
+          copiedLabel={t('common.copied')}
           variant="secondary"
           className="absolute right-2 top-2 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
         />

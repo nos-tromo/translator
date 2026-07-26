@@ -2,8 +2,6 @@ import type { Strings } from './index'
 
 export const de: Strings = {
   // common
-  'common.loading': 'Lädt',
-  'common.copy': 'Kopieren',
   'common.copied': 'Kopiert',
 
   // panel
@@ -13,7 +11,7 @@ export const de: Strings = {
   'panel.text_placeholder': 'Zu übersetzenden Text eingeben…',
   'panel.output_placeholder': 'Die Übersetzung wird hier angezeigt.',
   'panel.translate': 'Übersetzen',
-  'panel.translating': 'Übersetzt…',
+  'panel.translating': 'Wird übersetzt…',
   'panel.loading_languages': 'Sprachen werden geladen…',
   'panel.languages_error': 'Sprachen konnten nicht geladen werden: {error}',
   'panel.translate_error': 'Übersetzung fehlgeschlagen: {error}',

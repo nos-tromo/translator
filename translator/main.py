@@ -1,12 +1,15 @@
 """FastAPI application for the Translator service.
 
-Exposes two endpoints:
+Exposes endpoints under ``/api/v1``:
 
 * ``POST /translate`` — accepts text and a target language code, auto-detects
   (or accepts an explicit) source language, and returns the translation together
   with detected language metadata.
 * ``GET /languages`` — returns the list of supported language codes and their
   human-readable names sourced from ``language_map.json``.
+* ``GET /version`` — returns the running app version.
+* ``GET /config`` — returns the SPA bootstrap config (UI language).
+* ``GET /health`` — liveness probe.
 
 A single :class:`~translator.engine.Translator` instance is created at startup;
 ``OPENAI_API_BASE`` must therefore be set in the environment before the server
@@ -260,7 +263,7 @@ def get_version() -> dict[str, str]:
     return {"version": _APP_VERSION}
 
 
-@router.get("/config")
+@router.get("/config", summary="SPA bootstrap config", tags=["Metadata"])
 def get_config() -> ConfigResponse:
     """Return the SPA bootstrap config (UI language). Unauthenticated, like /health."""
     return ConfigResponse(language=load_ui_language())

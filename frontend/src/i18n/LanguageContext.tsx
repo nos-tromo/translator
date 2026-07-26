@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Spinner } from '@infra/ui'
 import { getConfig } from '../api/config'
@@ -16,6 +16,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     gcTime: Infinity,
     retry: 1,
   })
+  const language: Lang = data?.language === 'de' ? 'de' : 'en'
+  // Keep the document's lang attribute in sync so a de deployment never
+  // renders German text inside a lang="en" document.
+  useEffect(() => {
+    document.documentElement.lang = language
+  }, [language])
   // Block only the very first paint so a de deployment never flashes English;
   // a failed config fetch falls through to 'en' — it can never blank the UI.
   if (isLoading) {
@@ -25,7 +31,6 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       </div>
     )
   }
-  const language: Lang = data?.language === 'de' ? 'de' : 'en'
   return <LanguageContext.Provider value={language}>{children}</LanguageContext.Provider>
 }
 
