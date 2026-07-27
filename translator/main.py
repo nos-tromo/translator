@@ -1,12 +1,15 @@
 """FastAPI application for the Translator service.
 
-Exposes two endpoints:
+Exposes endpoints under ``/api/v1``:
 
 * ``POST /translate`` — accepts text and a target language code, auto-detects
   (or accepts an explicit) source language, and returns the translation together
   with detected language metadata.
 * ``GET /languages`` — returns the list of supported language codes and their
   human-readable names sourced from ``language_map.json``.
+* ``GET /version`` — returns the running app version.
+* ``GET /config`` — returns the SPA bootstrap config (UI language).
+* ``GET /health`` — liveness probe.
 
 A single :class:`~translator.engine.Translator` instance is created at startup;
 ``OPENAI_API_BASE`` and ``TEXT_MODEL`` must therefore be set in the environment
@@ -14,6 +17,7 @@ before the server starts.
 """
 
 import json
+import os
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
@@ -30,6 +34,28 @@ from translator.log_cfg import setup_logger
 setup_logger()
 
 MAX_TEXT_LENGTH = 20_000
+
+SUPPORTED_UI_LANGUAGES = ("en", "de")
+
+
+def load_ui_language() -> str:
+    """Resolve the SPA UI language from ``RESPONSE_LANGUAGE``.
+
+    Uniform federation variable (same name in every nos-tromo repo). It
+    controls only the UI locale — the translation *target* stays a
+    per-request choice and is unaffected. Unknown values fall back to
+    ``en`` so a typo cannot break bring-up; a warning is logged when an
+    invalid value is supplied.
+    """
+    raw = os.getenv("RESPONSE_LANGUAGE")
+    if raw is None:
+        return "en"
+    candidate = raw.strip().lower()
+    if candidate not in SUPPORTED_UI_LANGUAGES:
+        logger.warning(f"Unknown RESPONSE_LANGUAGE value supplied; falling back to 'en' (got: {raw!r})")
+        return "en"
+    return candidate
+
 
 # === FastAPI Setup ===
 
@@ -113,6 +139,12 @@ class TranslationResponse(BaseModel):
 
     translation: str
     detected_language: DetectedLanguage
+
+
+class ConfigResponse(BaseModel):
+    """Client bootstrap config for the SPA."""
+
+    language: str
 
 
 def _load_language_codes(
@@ -229,6 +261,12 @@ def get_version() -> dict[str, str]:
         version (or ``"0+unknown"`` when running uninstalled from source).
     """
     return {"version": _APP_VERSION}
+
+
+@router.get("/config", summary="SPA bootstrap config", tags=["Metadata"])
+def get_config() -> ConfigResponse:
+    """Return the SPA bootstrap config (UI language). Unauthenticated, like /health."""
+    return ConfigResponse(language=load_ui_language())
 
 
 @router.get(

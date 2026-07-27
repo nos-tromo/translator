@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Banner, Button, Spinner } from '@infra/ui'
 import { useLanguages } from '../hooks/useLanguages'
 import { useTranslate } from '../hooks/useTranslate'
+import { useT } from '../i18n/LanguageContext'
 import { AUTO_DETECT, LanguageSelect } from './LanguageSelect'
 import { FileTextInput } from './FileTextInput'
 import { OutputField } from './OutputField'
@@ -10,6 +11,7 @@ import { DetectedLanguageBanner } from './DetectedLanguageBanner'
 const DEFAULT_TARGET = import.meta.env.VITE_DEFAULT_TARGET_LANGUAGE ?? 'English'
 
 export function TranslatePanel() {
+  const t = useT()
   const languagesQuery = useLanguages()
   const translation = useTranslate()
 
@@ -38,9 +40,13 @@ export function TranslatePanel() {
     })
   }
 
-  if (languagesQuery.isLoading) return <Spinner label="Loading languages…" />
+  if (languagesQuery.isLoading) return <Spinner label={t('panel.loading_languages')} />
   if (languagesQuery.error) {
-    return <Banner variant="danger">Could not load languages: {String(languagesQuery.error)}</Banner>
+    return (
+      <Banner variant="danger">
+        {t('panel.languages_error', { error: String(languagesQuery.error) })}
+      </Banner>
+    )
   }
 
   const result = translation.data
@@ -49,7 +55,7 @@ export function TranslatePanel() {
       <div className="grid gap-4 md:grid-cols-2">
         <LanguageSelect
           id="source"
-          label="Source language"
+          label={t('panel.source_language')}
           value={source}
           onChange={setSource}
           languages={languages}
@@ -57,7 +63,7 @@ export function TranslatePanel() {
         />
         <LanguageSelect
           id="target"
-          label="Target language"
+          label={t('panel.target_language')}
           value={target}
           onChange={setTargetOverride}
           languages={languages}
@@ -67,15 +73,15 @@ export function TranslatePanel() {
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <textarea
-            aria-label="Text to translate"
+            aria-label={t('panel.text_aria')}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Enter text to translate…"
+            placeholder={t('panel.text_placeholder')}
             className="h-72 w-full resize-none rounded-md border border-border bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           />
           <FileTextInput onText={setText} onError={setFileError} />
         </div>
-        <OutputField value={result?.translation ?? ''} placeholder="Translation will appear here." />
+        <OutputField value={result?.translation ?? ''} placeholder={t('panel.output_placeholder')} />
       </div>
 
       <div className="flex items-center gap-3">
@@ -84,14 +90,16 @@ export function TranslatePanel() {
           onClick={onTranslate}
           disabled={text.trim().length === 0 || target === '' || translation.isPending}
         >
-          Translate
+          {t('panel.translate')}
         </Button>
-        {translation.isPending && <Spinner label="Translating…" />}
+        {translation.isPending && <Spinner label={t('panel.translating')} />}
       </div>
 
       {fileError && <Banner variant="danger">{fileError}</Banner>}
       {translation.error && (
-        <Banner variant="danger">Translation failed: {String(translation.error)}</Banner>
+        <Banner variant="danger">
+          {t('panel.translate_error', { error: String(translation.error) })}
+        </Banner>
       )}
       {result && (
         <DetectedLanguageBanner
