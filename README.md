@@ -67,6 +67,7 @@ Copy `.env.example` to `.env` and fill in your values.
 | `OPENAI_API_KEY` | No | `ollama` | API key (`ollama` works for local Ollama servers) |
 | `TRANSLATE_MODEL` | No | `translategemma:4b` | Model identifier |
 | `DEFAULT_TARGET_LANGUAGE` | No | `English` | Build-time default target language, baked into the SPA via the `VITE_DEFAULT_TARGET_LANGUAGE` build arg |
+| `RESPONSE_LANGUAGE` | No | `en` | UI language switch — `en` (English) or `de` (Deutsch). Drives the SPA interface only; the translation target language is unaffected |
 
 ## Tests
 

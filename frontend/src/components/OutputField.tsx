@@ -1,4 +1,5 @@
 import { CopyButton } from '@infra/ui'
+import { useT } from '../i18n/LanguageContext'
 
 interface OutputFieldProps {
   value: string
@@ -7,6 +8,7 @@ interface OutputFieldProps {
 
 /** Read-only translation output with a copy button revealed on hover/focus. */
 export function OutputField({ value, placeholder }: OutputFieldProps) {
+  const t = useT()
   return (
     <div className="group relative h-72 overflow-auto rounded-md border border-border bg-muted/30 p-3">
       {value ? (
@@ -17,7 +19,8 @@ export function OutputField({ value, placeholder }: OutputFieldProps) {
       {value && (
         <CopyButton
           text={value}
-          label="Copy translation"
+          label={t('output.copy_translation')}
+          copiedLabel={t('common.copied')}
           variant="secondary"
           className="absolute right-2 top-2 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
         />
