@@ -1,6 +1,6 @@
 # Translator
 
-A self-hosted translation service powered by [TranslateGemma](https://huggingface.co/google/translate-gemma-2b-it) via an OpenAI-compatible inference backend (e.g. [Ollama](https://ollama.com)).
+A self-hosted translation service powered by an instruction-tuned LLM (e.g. a Gemma-class model, configurable via `TRANSLATE_MODEL`) via an OpenAI-compatible inference backend (e.g. [Ollama](https://ollama.com)). The same model performs source-language detection — no local detection library.
 
 ## Architecture
 
@@ -13,7 +13,9 @@ A self-hosted translation service powered by [TranslateGemma](https://huggingfac
 
 ## Prerequisites
 
-An OpenAI-compatible inference server with TranslateGemma loaded. With Ollama:
+An OpenAI-compatible inference server with an instruction-tuned model loaded
+(it must follow instructions reliably — it handles both translation and
+source-language detection). With Ollama:
 
 ```bash
 # Create Docker network and persistent cache
@@ -29,8 +31,8 @@ docker run -d \
   -p 11434:11434 \
   ollama/ollama:0.20.2
 
-# Preload translation model
-docker exec ollama ollama pull translategemma:4b
+# Preload the translation model (any instruction-tuned Gemma-class model)
+docker exec ollama ollama pull <model>
 ```
 
 ## Local development

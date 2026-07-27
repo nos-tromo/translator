@@ -145,7 +145,7 @@ def _load_language_codes(
 @router.post(
     "/translate",
     summary="Translate text",
-    description="Translates input text to a target language using TranslateGemma via an OpenAI-compatible endpoint.",
+    description="Translates input text to a target language via an OpenAI-compatible endpoint.",
     tags=["Translation"],
     response_model=TranslationResponse,
 )
@@ -196,7 +196,7 @@ def translate(req: TranslationRequest) -> TranslationResponse | None:
 @router.get(
     "/languages",
     summary="List supported languages",
-    description="Returns a list of supported TranslateGemma language codes with human-readable names, "
+    description="Returns a list of supported language codes with human-readable names, "
     "based on the included `language_map.json` file.",
     tags=["Metadata"],
 )
