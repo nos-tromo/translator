@@ -14,8 +14,6 @@ export const en = {
   'panel.translate': 'Translate',
   'panel.translating': 'Translating…',
   'panel.loading_languages': 'Loading languages…',
-  'panel.languages_error': 'Could not load languages: {error}',
-  'panel.translate_error': 'Translation failed: {error}',
 
   // select
   'select.auto_detect': 'Auto-detect',

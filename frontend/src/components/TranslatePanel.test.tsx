@@ -98,6 +98,34 @@ describe('TranslatePanel', () => {
     expect(body).toMatchObject({ text: 'Hello world', target_lang: 'fr' })
   })
 
+  it('renders a generic error banner on translate failure, never the raw detail', async () => {
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/languages')) {
+        return jsonResponse([
+          { code: 'en', name: 'English' },
+          { code: 'fr', name: 'French' },
+        ])
+      }
+      return new Response(JSON.stringify({ detail: 'boom' }), {
+        status: 500,
+        headers: { 'content-type': 'application/json' },
+      })
+    })
+    vi.stubGlobal('fetch', fetchFn)
+
+    renderPanel()
+
+    const input = await screen.findByLabelText('Text to translate')
+    await userEvent.type(input, 'Hello world')
+    await userEvent.click(screen.getByRole('button', { name: 'Translate' }))
+
+    expect(
+      await screen.findByText('Something went wrong (500). Please try again or contact support.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/boom/)).not.toBeInTheDocument()
+  })
+
   it('renders German chrome when language is de', async () => {
     const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)

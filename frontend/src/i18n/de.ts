@@ -16,8 +16,6 @@ export const de: Strings = {
   'panel.translate': 'Übersetzen',
   'panel.translating': 'Wird übersetzt…',
   'panel.loading_languages': 'Sprachen werden geladen…',
-  'panel.languages_error': 'Sprachen konnten nicht geladen werden: {error}',
-  'panel.translate_error': 'Übersetzung fehlgeschlagen: {error}',
 
   // select
   'select.auto_detect': 'Automatisch erkennen',
