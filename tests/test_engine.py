@@ -36,6 +36,27 @@ def test_create_client_raises_without_base_url(monkeypatch: pytest.MonkeyPatch) 
         Translator()
 
 
+def test_constructor_raises_without_text_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Raises ``ValueError`` when ``TEXT_MODEL`` is unset.
+
+    Args:
+        monkeypatch: Pytest fixture for temporarily removing environment variables.
+    """
+    monkeypatch.delenv("TEXT_MODEL", raising=False)
+    with pytest.raises(ValueError, match="TEXT_MODEL"):
+        Translator()
+
+
+def test_constructor_reads_text_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Uses the ``TEXT_MODEL`` value verbatim as the model identifier.
+
+    Args:
+        monkeypatch: Pytest fixture for setting environment variables.
+    """
+    monkeypatch.setenv("TEXT_MODEL", "some/model-id")
+    assert Translator().model == "some/model-id"
+
+
 def test_create_client_succeeds_with_base_url(translator: Translator) -> None:
     """``client`` is initialised when ``OPENAI_API_BASE`` is present.
 

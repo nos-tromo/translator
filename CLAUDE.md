@@ -118,7 +118,7 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
 | `OPENAI_API_BASE` | Yes | — | Base URL of the OpenAI-compatible inference endpoint (e.g. `http://vllm-router:4000/v1` or `http://ollama:11434/v1`) |
 | `OPENAI_API_KEY` | No | `dummy` | API key; `dummy` is fine for local servers that don't enforce auth |
 | `OPENAI_TIMEOUT` | No | `60` | Per-request timeout in seconds |
-| `TRANSLATE_MODEL` | No | `google/translate-gemma-2b-it` | Model identifier passed in every chat completions request (translation + language detection — use an instruction-tuned model) |
+| `TEXT_MODEL` | Yes | — (compose fallback: `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`) | Model identifier passed in every chat completions request (translation + language detection — use an instruction-tuned model). Never hardcoded in Python — the fallback lives only in `docker/compose.yaml` |
 | `DEFAULT_TARGET_LANGUAGE` | No (build) | `English` | Default target language; passed as the `VITE_DEFAULT_TARGET_LANGUAGE` build arg and baked into the SPA at image build |
 | `TRANSLATOR_HOST_PORT` | No | `8501` | Dev-only host port; mapped to the frontend container's nginx on :80 |
 | `INFERENCE_NETWORK` | No | `inference-net` | External Docker network name to join |
@@ -131,8 +131,8 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
   `OPENAI_API_BASE` swap is the only thing that changes between providers
   (vllm-router, Ollama, an external OpenAI-compatible endpoint).
 - **Startup-time client.** `translator = Translator()` is module-scope in
-  `main.py`, so `OPENAI_API_BASE` must be set before uvicorn starts —
-  otherwise the import fails with a clear `ValueError`.
+  `main.py`, so `OPENAI_API_BASE` and `TEXT_MODEL` must be set before uvicorn
+  starts — otherwise the import fails with a clear `ValueError`.
 - **The LLM does the language detection.** No local detection library:
   `engine.py::Translator.detect_language` sends the first
   `DETECTION_PREFIX_LIMIT` (500) characters to the configured model and asks

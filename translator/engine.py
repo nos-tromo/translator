@@ -57,15 +57,19 @@ class Translator:
     def __init__(self) -> None:
         """Initialise the Translator.
 
-        Reads ``OPENAI_API_BASE`` (required) and ``TRANSLATE_MODEL`` (optional)
-        from the environment and sets up the API client.
+        Reads ``OPENAI_API_BASE`` and ``TEXT_MODEL`` (both required) from the
+        environment and sets up the API client. No model identifier is
+        hardcoded here — the fallback default lives in ``docker/compose.yaml``.
 
         Raises:
-            ValueError: If ``OPENAI_API_BASE`` is not set.
+            ValueError: If ``OPENAI_API_BASE`` or ``TEXT_MODEL`` is not set.
         """
         self.logger = logging.getLogger(self.__class__.__name__)
         self.client = self._create_client()
-        self.model = os.getenv("TRANSLATE_MODEL", "google/translate-gemma-2b-it")
+        model = os.getenv("TEXT_MODEL")
+        if not model:
+            raise ValueError("TEXT_MODEL environment variable is required.")
+        self.model = model
 
     def _create_client(self) -> OpenAI:
         """Create an OpenAI-compatible client from environment variables.

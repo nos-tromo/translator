@@ -9,8 +9,8 @@ Exposes two endpoints:
   human-readable names sourced from ``language_map.json``.
 
 A single :class:`~translator.engine.Translator` instance is created at startup;
-``OPENAI_API_BASE`` must therefore be set in the environment before the server
-starts.
+``OPENAI_API_BASE`` and ``TEXT_MODEL`` must therefore be set in the environment
+before the server starts.
 """
 
 import json
