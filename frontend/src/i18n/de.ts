@@ -3,6 +3,9 @@ import type { Strings } from './index'
 export const de: Strings = {
   // common
   'common.copied': 'Kopiert',
+  'common.error_request': 'Etwas ist schiefgelaufen ({status}). Bitte erneut versuchen oder den Support kontaktieren.',
+  'common.error_unknown': 'Etwas ist schiefgelaufen. Bitte erneut versuchen oder den Support kontaktieren.',
+  'common.error_network': 'Dienst nicht erreichbar. Bitte Verbindung prüfen oder später erneut versuchen.',
 
   // panel
   'panel.source_language': 'Ausgangssprache',
