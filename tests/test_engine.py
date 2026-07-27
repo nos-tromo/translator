@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from translator.engine import Translator
+from translator.engine import DETECTION_PREFIX_LIMIT, Translator
 
 
 @pytest.fixture
@@ -34,6 +34,27 @@ def test_create_client_raises_without_base_url(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.delenv("OPENAI_API_BASE", raising=False)
     with pytest.raises(ValueError, match="OPENAI_API_BASE"):
         Translator()
+
+
+def test_constructor_raises_without_text_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Raises ``ValueError`` when ``TEXT_MODEL`` is unset.
+
+    Args:
+        monkeypatch: Pytest fixture for temporarily removing environment variables.
+    """
+    monkeypatch.delenv("TEXT_MODEL", raising=False)
+    with pytest.raises(ValueError, match="TEXT_MODEL"):
+        Translator()
+
+
+def test_constructor_reads_text_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Uses the ``TEXT_MODEL`` value verbatim as the model identifier.
+
+    Args:
+        monkeypatch: Pytest fixture for setting environment variables.
+    """
+    monkeypatch.setenv("TEXT_MODEL", "some/model-id")
+    assert Translator().model == "some/model-id"
 
 
 def test_create_client_succeeds_with_base_url(translator: Translator) -> None:
@@ -140,53 +161,83 @@ def test_get_language_info_unknown_code(translator: Translator) -> None:
 # ── detect_language ────────────────────────────────────────────────────────────
 
 
-def test_detect_language_english(translator: Translator) -> None:
-    """Detects English text and returns the resolved name and ISO code.
+def _mock_detection_client(translator: Translator, reply: str) -> MagicMock:
+    """Install a mocked OpenAI client returning ``reply`` and hand it back.
+
+    Args:
+        translator: Engine instance whose client is replaced.
+        reply: Message content the mocked completions call returns.
+
+    Returns:
+        MagicMock: The installed mock client, for call inspection.
+    """
+    mock_resp = MagicMock()
+    mock_resp.choices[0].message.content = reply
+    translator.client = MagicMock()
+    translator.client.chat.completions.create.return_value = mock_resp
+    return translator.client
+
+
+def test_detect_language_resolves_code(translator: Translator) -> None:
+    """Resolves the model's ISO code reply to code, name, and flag.
 
     Args:
         translator: Translator instance provided by the ``translator`` fixture.
     """
+    _mock_detection_client(translator, "en")
     result = translator.detect_language("The quick brown fox jumps over the lazy dog.")
-    assert result["name"] == "English"
     assert result["code"] == "en"
+    assert result["name"] == "English"
+    assert result["flag"] != ""
 
 
-def test_detect_language_french_returns_code(translator: Translator) -> None:
-    """Returns the detected ISO 639-1 code for French text.
+def test_detect_language_parses_decorated_reply(translator: Translator) -> None:
+    """Extracts the code when the model decorates its reply with extra text.
 
     Args:
         translator: Translator instance provided by the ``translator`` fixture.
     """
+    _mock_detection_client(translator, 'The language is French ("fr").')
     result = translator.detect_language("Bonjour le monde, comment allez-vous aujourd'hui?")
     assert result["code"] == "fr"
+    assert result["name"] == "French"
 
 
-def test_detect_language_returns_empty_on_error(translator: Translator, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Returns an empty ``code``/``name``/``flag`` dict when ``detect`` raises.
+def test_detect_language_truncates_prompt_to_prefix(translator: Translator) -> None:
+    """Sends at most ``DETECTION_PREFIX_LIMIT`` characters of the text.
 
     Args:
         translator: Translator instance provided by the ``translator`` fixture.
-        monkeypatch: Pytest fixture for patching ``translator.engine.detect``.
     """
-    monkeypatch.setattr("translator.engine.detect", lambda _: (_ for _ in ()).throw(Exception("fail")))
+    client = _mock_detection_client(translator, "en")
+    long_text = "word " * 1_000
+    translator.detect_language(long_text)
+    prompt = client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+    assert long_text[:DETECTION_PREFIX_LIMIT] in prompt
+    assert long_text[: DETECTION_PREFIX_LIMIT + 5] not in prompt
+
+
+def test_detect_language_returns_empty_on_unparseable_reply(translator: Translator) -> None:
+    """Returns an empty ``code``/``name``/``flag`` dict when no code is found.
+
+    Args:
+        translator: Translator instance provided by the ``translator`` fixture.
+    """
+    _mock_detection_client(translator, "I cannot determine the language.")
     result = translator.detect_language("???")
     assert result == {"code": "", "name": "", "flag": ""}
 
 
-def test_detect_language_deterministic(translator: Translator) -> None:
-    """Returns the same code on repeated detection of identical text.
-
-    Guards the ``DetectorFactory.seed`` setting that pins langdetect's RNG and
-    keeps results reproducible across requests.
+def test_detect_language_returns_empty_on_api_error(translator: Translator) -> None:
+    """Returns an empty ``code``/``name``/``flag`` dict when the API call fails.
 
     Args:
         translator: Translator instance provided by the ``translator`` fixture.
     """
-    text = "The quick brown fox jumps over the lazy dog."
-    first = translator.detect_language(text)
-    second = translator.detect_language(text)
-    assert first["code"] == second["code"]
-    assert first["code"] != ""
+    translator.client = MagicMock()
+    translator.client.chat.completions.create.side_effect = Exception("Connection refused")
+    result = translator.detect_language("Hello")
+    assert result == {"code": "", "name": "", "flag": ""}
 
 
 # ── translate ──────────────────────────────────────────────────────────────────
@@ -252,6 +303,25 @@ def test_translate_prompt_contains_source_text(translator: Translator) -> None:
 
     prompt = translator.client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
     assert "Good morning" in prompt
+
+
+def test_translate_unknown_source_uses_source_agnostic_prompt(translator: Translator) -> None:
+    """Falls back to a source-agnostic prompt when the source language is unknown.
+
+    Args:
+        translator: Translator instance provided by the ``translator`` fixture.
+    """
+    mock_resp = MagicMock()
+    mock_resp.choices[0].message.content = "Hallo"
+    translator.client = MagicMock()
+    translator.client.chat.completions.create.return_value = mock_resp
+
+    translator.translate("Hello", "", "", "German", "de")
+
+    prompt = translator.client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+    assert "German (de)" in prompt
+    assert "()" not in prompt
+    assert "Hello" in prompt
 
 
 def test_translate_passes_model_to_client(translator: Translator) -> None:

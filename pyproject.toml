@@ -13,7 +13,6 @@ dependencies = [
     "emoji-country-flag>=2.1.0",
     "fastapi>=0.140.0",
     "langcodes[data]>=3.5.1",
-    "langdetect>=1.0.9",
     "loguru>=0.7.3",
     "openai>=2.48.0",
     "prometheus-fastapi-instrumentator>=8.1.0",

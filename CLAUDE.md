@@ -20,8 +20,8 @@ root (e.g. `docker/compose.yaml`).
 
 ## Project Overview
 
-translator is a thin translation service: a FastAPI backend that calls a
-TranslateGemma-class model via any OpenAI-compatible chat/completions endpoint,
+translator is a thin translation service: a FastAPI backend that calls an
+instruction-tuned Gemma-class model via any OpenAI-compatible chat/completions endpoint,
 fronted by a React single-page app (Vite + `@infra/ui`, served by nginx). It
 runs no models of its own — it is a typed, audited, language-aware wrapper
 around an external inference endpoint.
@@ -82,8 +82,10 @@ translator/                       # the importable package
                  Endpoints under /api/v1: POST /translate, GET /languages,
                  GET /health.
   engine.py      Translator class. Wraps an OpenAI-compatible client to call
-                 a TranslateGemma model. Uses langdetect for source detection,
-                 pycountry/langcodes/emoji-country-flag for display metadata.
+                 the configured model for both translation and source-language
+                 detection (a small second completions call on a bounded text
+                 prefix). Uses pycountry/langcodes/emoji-country-flag for
+                 display metadata.
   log_cfg.py     Loguru setup (stderr only; container driver rotates).
   language_map.json
                  Static ISO 639-1 → human-readable name map (~50 entries),
@@ -116,7 +118,7 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
 | `OPENAI_API_BASE` | Yes | — | Base URL of the OpenAI-compatible inference endpoint (e.g. `http://vllm-router:4000/v1` or `http://ollama:11434/v1`) |
 | `OPENAI_API_KEY` | No | `dummy` | API key; `dummy` is fine for local servers that don't enforce auth |
 | `OPENAI_TIMEOUT` | No | `60` | Per-request timeout in seconds |
-| `TRANSLATE_MODEL` | No | `google/translate-gemma-2b-it` | Model identifier passed in every chat completions request |
+| `TEXT_MODEL` | Yes | — (compose fallback: `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`) | Model identifier passed in every chat completions request (translation + language detection — use an instruction-tuned model). Never hardcoded in Python — the fallback lives only in `docker/compose.yaml` |
 | `DEFAULT_TARGET_LANGUAGE` | No (build) | `English` | Default target language; passed as the `VITE_DEFAULT_TARGET_LANGUAGE` build arg and baked into the SPA at image build |
 | `TRANSLATOR_HOST_PORT` | No | `8501` | Dev-only host port; mapped to the frontend container's nginx on :80 |
 | `INFERENCE_NETWORK` | No | `inference-net` | External Docker network name to join |
@@ -129,11 +131,19 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
   `OPENAI_API_BASE` swap is the only thing that changes between providers
   (vllm-router, Ollama, an external OpenAI-compatible endpoint).
 - **Startup-time client.** `translator = Translator()` is module-scope in
-  `main.py`, so `OPENAI_API_BASE` must be set before uvicorn starts —
-  otherwise the import fails with a clear `ValueError`.
-- **Prompt is TranslateGemma-shaped.** The instruction includes both source
+  `main.py`, so `OPENAI_API_BASE` and `TEXT_MODEL` must be set before uvicorn
+  starts — otherwise the import fails with a clear `ValueError`.
+- **The LLM does the language detection.** No local detection library:
+  `engine.py::Translator.detect_language` sends the first
+  `DETECTION_PREFIX_LIMIT` (500) characters to the configured model and asks
+  for only the ISO 639-1 code (`temperature=0`, `max_tokens=10`), parsing the
+  reply defensively. This replaced `langdetect`, which misclassified short
+  inputs (e.g. "Hello" → Finnish). Requires an instruction-tuned model.
+- **Translation prompt names both languages.** The instruction includes source
   and target language names + ISO codes; the model is asked to emit only the
-  translation, no commentary. See `engine.py::Translator.translate`.
+  translation, no commentary. If detection failed (empty source name) a
+  source-agnostic variant is used so a wrong source language is never asserted.
+  See `engine.py::Translator.translate`.
 - **Same-origin, no CORS.** The SPA is served by nginx, which proxies `/api/*`
   to the backend, so browser calls are always same-origin and `main.py` runs no
   CORS middleware. The backend exposes its routes under `/api/v1` (plus

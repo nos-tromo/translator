@@ -1,6 +1,6 @@
 # Translator
 
-A self-hosted translation service powered by [TranslateGemma](https://huggingface.co/google/translate-gemma-2b-it) via an OpenAI-compatible inference backend (e.g. [Ollama](https://ollama.com)).
+A self-hosted translation service powered by an instruction-tuned LLM (e.g. a Gemma-class model, configurable via `TEXT_MODEL`) via an OpenAI-compatible inference backend (e.g. [Ollama](https://ollama.com)). The same model performs source-language detection — no local detection library.
 
 ## Architecture
 
@@ -13,7 +13,9 @@ A self-hosted translation service powered by [TranslateGemma](https://huggingfac
 
 ## Prerequisites
 
-An OpenAI-compatible inference server with TranslateGemma loaded. With Ollama:
+An OpenAI-compatible inference server with an instruction-tuned model loaded
+(it must follow instructions reliably — it handles both translation and
+source-language detection). With Ollama:
 
 ```bash
 # Create Docker network and persistent cache
@@ -29,8 +31,8 @@ docker run -d \
   -p 11434:11434 \
   ollama/ollama:0.20.2
 
-# Preload translation model
-docker exec ollama ollama pull translategemma:4b
+# Preload the translation model (any instruction-tuned Gemma-class model)
+docker exec ollama ollama pull <model>
 ```
 
 ## Local development
@@ -39,7 +41,7 @@ docker exec ollama ollama pull translategemma:4b
 uv sync --group dev
 
 # Backend (FastAPI)
-OPENAI_API_BASE=http://localhost:11434/v1 uv run uvicorn translator.main:app --reload
+OPENAI_API_BASE=http://localhost:11434/v1 TEXT_MODEL=<model> uv run uvicorn translator.main:app --reload
 # API docs → http://127.0.0.1:8000/docs
 
 # Frontend (React SPA) — in a second terminal
@@ -65,7 +67,7 @@ Copy `.env.example` to `.env` and fill in your values.
 |---|---|---|---|
 | `OPENAI_API_BASE` | Yes | — | Base URL of the OpenAI-compatible endpoint — must include `/v1` (e.g. `http://localhost:11434/v1`) |
 | `OPENAI_API_KEY` | No | `ollama` | API key (`ollama` works for local Ollama servers) |
-| `TRANSLATE_MODEL` | No | `translategemma:4b` | Model identifier |
+| `TEXT_MODEL` | Yes | — (compose fallback: `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`) | Model identifier for translation + language detection |
 | `DEFAULT_TARGET_LANGUAGE` | No | `English` | Build-time default target language, baked into the SPA via the `VITE_DEFAULT_TARGET_LANGUAGE` build arg |
 | `RESPONSE_LANGUAGE` | No | `en` | UI language switch — `en` (English) or `de` (Deutsch). Drives the SPA interface only; the translation target language is unaffected |
 

@@ -1,25 +1,49 @@
 """Translation engine backed by an OpenAI-compatible chat/completions API.
 
-Wraps the OpenAI Python client to call a TranslateGemma model served by any
-OpenAI-compatible inference backend (e.g. Ollama). Language detection is
-provided by ``langdetect``; country flag emojis are resolved via ``langcodes``,
-``pycountry``, and ``emoji-country-flag``.
+Wraps the OpenAI Python client to call an instruction-tuned model (e.g.
+Gemma-class) served by any OpenAI-compatible inference backend. Language
+detection is delegated to the same model; country flag emojis are resolved
+via ``langcodes``, ``pycountry``, and ``emoji-country-flag``.
 """
 
 import logging
 import os
+import re
 
 import flag
 import pycountry
 from langcodes import Language
-from langdetect import DetectorFactory, detect
 from openai import OpenAI
 
-DetectorFactory.seed = 42  # Set seed for reproducibility in language detection
+# Language detection only needs the beginning of the text; a bounded prefix
+# keeps the detection call cheap regardless of input size.
+DETECTION_PREFIX_LIMIT = 500
+
+# A parenthesised code like "(fr)" is unambiguous even inside a sentence; a
+# bare two-letter token is only trusted when it is the whole reply, because
+# English filler words ("is", "in", "it") collide with valid ISO 639-1 codes.
+_PARENTHESISED_CODE_RE = re.compile(r"\(\s*[\"']?([a-z]{2})[\"']?\s*\)")
+
+
+def _parse_iso_code(reply: str) -> str | None:
+    """Extract an ISO 639-1 code from a model reply, or ``None`` if absent.
+
+    Args:
+        reply: Raw message content returned by the detection call.
+
+    Returns:
+        The lowercased two-letter code, or ``None`` when the reply cannot be
+        interpreted unambiguously.
+    """
+    bare = reply.strip().strip("\"'.`").lower()
+    if len(bare) == 2 and bare.isalpha():
+        return bare
+    match = _PARENTHESISED_CODE_RE.search(reply.lower())
+    return match.group(1) if match else None
 
 
 class Translator:
-    """Translation engine that calls a TranslateGemma model via a chat completions API.
+    """Translation engine that calls an LLM via a chat completions API.
 
     The engine detects the source language of arbitrary text, resolves human-
     readable language names and country flag emojis for display, and submits
@@ -33,15 +57,19 @@ class Translator:
     def __init__(self) -> None:
         """Initialise the Translator.
 
-        Reads ``OPENAI_API_BASE`` (required) and ``TRANSLATE_MODEL`` (optional)
-        from the environment and sets up the API client.
+        Reads ``OPENAI_API_BASE`` and ``TEXT_MODEL`` (both required) from the
+        environment and sets up the API client. No model identifier is
+        hardcoded here — the fallback default lives in ``docker/compose.yaml``.
 
         Raises:
-            ValueError: If ``OPENAI_API_BASE`` is not set.
+            ValueError: If ``OPENAI_API_BASE`` or ``TEXT_MODEL`` is not set.
         """
         self.logger = logging.getLogger(self.__class__.__name__)
         self.client = self._create_client()
-        self.model = os.getenv("TRANSLATE_MODEL", "google/translate-gemma-2b-it")
+        model = os.getenv("TEXT_MODEL")
+        if not model:
+            raise ValueError("TEXT_MODEL environment variable is required.")
+        self.model = model
 
     def _create_client(self) -> OpenAI:
         """Create an OpenAI-compatible client from environment variables.
@@ -111,7 +139,13 @@ class Translator:
             return {"name": code, "flag": ""}
 
     def detect_language(self, text: str) -> dict[str, str]:
-        """Detect the language of a text string.
+        """Detect the language of a text string via the configured model.
+
+        Sends a bounded prefix of the text (``DETECTION_PREFIX_LIMIT`` chars)
+        to the chat completions endpoint and asks for the ISO 639-1 code only.
+        The reply is parsed defensively (see :func:`_parse_iso_code`) so minor
+        decoration — quotes, trailing punctuation, or a parenthesised code —
+        does not break detection.
 
         Args:
             text: Text whose language should be detected.
@@ -122,7 +156,23 @@ class Translator:
             Returns ``{"code": "", "name": "", "flag": ""}`` if detection fails.
         """
         try:
-            src_lang_code = detect(text)
+            prompt = (
+                "Identify the language of the following text. Reply with only the "
+                "ISO 639-1 two-letter language code (for example: en, de, fr) and "
+                f"nothing else.\n\nText:\n{text[:DETECTION_PREFIX_LIMIT]}"
+            )
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=10,
+            )
+            content = response.choices[0].message.content
+            if not isinstance(content, str):
+                raise RuntimeError("Language detection response did not contain text content.")
+            src_lang_code = _parse_iso_code(content)
+            if src_lang_code is None:
+                raise RuntimeError(f"No ISO 639-1 code found in detection response: {content!r}")
             src_lang_obj = pycountry.languages.get(alpha_2=src_lang_code)
             src_lang_name = src_lang_obj.name if src_lang_obj else src_lang_code
             country_flag = self._get_country_flag(src_lang_name)
@@ -139,10 +189,12 @@ class Translator:
         trg_lang_name: str,
         trg_lang_code: str,
     ) -> str:
-        """Translate text using the configured TranslateGemma model.
+        """Translate text using the configured model.
 
-        Constructs a structured prompt following the TranslateGemma schema and
-        submits it to the OpenAI-compatible chat completions endpoint.
+        Constructs a translation prompt and submits it to the OpenAI-compatible
+        chat completions endpoint. When the source language is unknown (empty
+        ``src_lang_name``, e.g. after a failed detection) a source-agnostic
+        prompt is used instead of asserting a wrong source language.
 
         Args:
             text: Source text to translate.
@@ -162,15 +214,25 @@ class Translator:
             if not text:
                 raise ValueError("Input text cannot be empty.")
 
-            prompt = (
-                f"You are a professional {src_lang_name} ({src_lang_code}) to "
-                f"{trg_lang_name} ({trg_lang_code}) translator. Your goal is to accurately "
-                f"convey the meaning and nuances of the original {src_lang_name} text while "
-                f"adhering to {trg_lang_name} grammar, vocabulary, and cultural sensitivities.\n"
-                f"Produce only the {trg_lang_name} translation, without any additional "
-                f"explanations or commentary. Please translate the following {src_lang_name} "
-                f"text into {trg_lang_name}:\n\n\n{text}"
-            )
+            if src_lang_name:
+                prompt = (
+                    f"You are a professional {src_lang_name} ({src_lang_code}) to "
+                    f"{trg_lang_name} ({trg_lang_code}) translator. Your goal is to accurately "
+                    f"convey the meaning and nuances of the original {src_lang_name} text while "
+                    f"adhering to {trg_lang_name} grammar, vocabulary, and cultural sensitivities.\n"
+                    f"Produce only the {trg_lang_name} translation, without any additional "
+                    f"explanations or commentary. Please translate the following {src_lang_name} "
+                    f"text into {trg_lang_name}:\n\n\n{text}"
+                )
+            else:
+                prompt = (
+                    f"You are a professional translator into {trg_lang_name} ({trg_lang_code}). "
+                    f"Your goal is to accurately convey the meaning and nuances of the original "
+                    f"text while adhering to {trg_lang_name} grammar, vocabulary, and cultural "
+                    f"sensitivities.\nProduce only the {trg_lang_name} translation, without any "
+                    f"additional explanations or commentary. Please translate the following text "
+                    f"into {trg_lang_name}:\n\n\n{text}"
+                )
 
             response = self.client.chat.completions.create(
                 model=self.model,

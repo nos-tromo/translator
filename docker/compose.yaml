@@ -39,7 +39,7 @@ services:
       <<: *no-proxy-env
       OPENAI_API_BASE: ${OPENAI_API_BASE}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-dummy}
-      TRANSLATE_MODEL: ${TRANSLATE_MODEL:-google/translate-gemma-2b-it}
+      TEXT_MODEL: ${TEXT_MODEL:-cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit}
       # Uniform federation UI-language switch (en|de, default en). UI only —
       # the translation target stays a per-request choice.
       RESPONSE_LANGUAGE: ${RESPONSE_LANGUAGE:-en}
