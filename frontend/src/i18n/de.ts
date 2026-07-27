@@ -5,7 +5,7 @@ export const de: Strings = {
   'common.copied': 'Kopiert',
   'common.error_request': 'Fehler ({status}) – Bitte versuchen Sie es erneut oder kontaktieren Sie den Support.',
   'common.error_unknown': 'Fehler – Bitte versuchen Sie es erneut oder kontaktieren Sie den Support.',
-  'common.error_network': 'Dienst nicht erreichbar. Bitte Verbindung prüfen oder später erneut versuchen.',
+  'common.error_network': 'Dienst nicht erreichbar – Bitte prüfen Sie Ihre Verbindung oder versuchen Sie es später erneut.',
 
   // panel
   'panel.source_language': 'Ausgangssprache',
