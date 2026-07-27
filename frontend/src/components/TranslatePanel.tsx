@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Banner, Button, Spinner } from '@infra/ui'
+import { describeError } from '../api/errorMessage'
 import { useLanguages } from '../hooks/useLanguages'
 import { useTranslate } from '../hooks/useTranslate'
 import { useT } from '../i18n/LanguageContext'
@@ -42,13 +43,11 @@ export function TranslatePanel() {
 
   if (languagesQuery.isLoading) return <Spinner label={t('panel.loading_languages')} />
   if (languagesQuery.error) {
-    return (
-      <Banner variant="danger">
-        {t('panel.languages_error', { error: String(languagesQuery.error) })}
-      </Banner>
-    )
+    const d = describeError(languagesQuery.error)
+    return <Banner variant="danger">{t(d.key, d.vars)}</Banner>
   }
 
+  const translateError = translation.error ? describeError(translation.error) : null
   const result = translation.data
   return (
     <div className="space-y-4">
@@ -96,11 +95,7 @@ export function TranslatePanel() {
       </div>
 
       {fileError && <Banner variant="danger">{fileError}</Banner>}
-      {translation.error && (
-        <Banner variant="danger">
-          {t('panel.translate_error', { error: String(translation.error) })}
-        </Banner>
-      )}
+      {translateError && <Banner variant="danger">{t(translateError.key, translateError.vars)}</Banner>}
       {result && (
         <DetectedLanguageBanner
           name={result.detected_language.name}

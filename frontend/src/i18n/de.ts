@@ -3,6 +3,9 @@ import type { Strings } from './index'
 export const de: Strings = {
   // common
   'common.copied': 'Kopiert',
+  'common.error_request': 'Etwas ist schiefgelaufen ({status}). Bitte erneut versuchen oder den Support kontaktieren.',
+  'common.error_unknown': 'Etwas ist schiefgelaufen. Bitte erneut versuchen oder den Support kontaktieren.',
+  'common.error_network': 'Dienst nicht erreichbar. Bitte Verbindung prüfen oder später erneut versuchen.',
 
   // panel
   'panel.source_language': 'Ausgangssprache',
@@ -13,8 +16,6 @@ export const de: Strings = {
   'panel.translate': 'Übersetzen',
   'panel.translating': 'Wird übersetzt…',
   'panel.loading_languages': 'Sprachen werden geladen…',
-  'panel.languages_error': 'Sprachen konnten nicht geladen werden: {error}',
-  'panel.translate_error': 'Übersetzung fehlgeschlagen: {error}',
 
   // select
   'select.auto_detect': 'Automatisch erkennen',

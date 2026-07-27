@@ -1,6 +1,9 @@
 export const en = {
   // common
   'common.copied': 'Copied',
+  'common.error_request': 'Something went wrong ({status}). Please try again or contact support.',
+  'common.error_unknown': 'Something went wrong. Please try again or contact support.',
+  'common.error_network': 'Service unreachable. Please check your connection or try again later.',
 
   // panel
   'panel.source_language': 'Source language',
@@ -11,8 +14,6 @@ export const en = {
   'panel.translate': 'Translate',
   'panel.translating': 'Translating…',
   'panel.loading_languages': 'Loading languages…',
-  'panel.languages_error': 'Could not load languages: {error}',
-  'panel.translate_error': 'Translation failed: {error}',
 
   // select
   'select.auto_detect': 'Auto-detect',
