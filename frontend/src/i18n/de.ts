@@ -1,6 +1,12 @@
 import type { Strings } from './index'
 
 export const de: Strings = {
+  // appheader
+  'appheader.home': 'Übersicht',
+  'appheader.theme_system': 'System',
+  'appheader.theme_light': 'Hell',
+  'appheader.theme_dark': 'Dunkel',
+
   // common
   'common.copied': 'Kopiert',
   'common.error_request': 'Etwas ist schiefgelaufen ({status}) – Bitte versuchen Sie es erneut oder kontaktieren Sie den Support.',

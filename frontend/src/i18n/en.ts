@@ -1,4 +1,10 @@
 export const en = {
+  // appheader
+  'appheader.home': 'Apps',
+  'appheader.theme_system': 'system',
+  'appheader.theme_light': 'light',
+  'appheader.theme_dark': 'dark',
+
   // common
   'common.copied': 'Copied',
   'common.error_request': 'Something went wrong ({status}). Please try again or contact support.',

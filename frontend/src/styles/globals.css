@@ -5,7 +5,22 @@
 :root {
   /* translator's single design-system knob; primary derives from this. */
   --app-accent: hsl(217 91% 60%);
-  color-scheme: dark;
+}
+
+/* The base accent fails WCAG AA (~3.63:1) as text on the light background;
+   darken it for legibility there. infra-ui/theme.css owns color-scheme. */
+:root:not([data-theme='dark']) {
+  --app-accent: hsl(217 91% 45%);
+}
+
+/* :not([data-theme='dark']) also matches system mode with no explicit
+   choice stamped — including when the OS prefers dark, where the 45%
+   variant reads as ~3.10:1 on the dark background (worse than the base
+   60%'s ~5.10:1). Restore the base accent for that case. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --app-accent: hsl(217 91% 60%);
+  }
 }
 
 html,
