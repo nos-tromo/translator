@@ -1,6 +1,6 @@
 import { QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { AppHeader } from '@infra/ui'
-import { getVersion } from './api/translator'
+import { getVersion, getWhoami } from './api/translator'
 import { queryClient } from './api/queryClient'
 import { TranslatePanel } from './components/TranslatePanel'
 import { LanguageProvider, useT } from './i18n/LanguageContext'
@@ -12,11 +12,21 @@ function AppContent() {
     queryFn: getVersion,
     staleTime: Infinity,
   })
+  // Loading and error states both resolve to `undefined` so the header
+  // simply omits the user block rather than showing a stale/error placeholder.
+  const { data: whoami } = useQuery({
+    queryKey: ['whoami'],
+    queryFn: getWhoami,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: false,
+  })
   return (
     <div className="min-h-full">
       <AppHeader
         title="translator"
         version={data?.version ? `v${data.version}` : undefined}
+        user={whoami?.display_name ?? whoami?.username ?? undefined}
         homeLabel={t('appheader.home')}
         themeLabels={{
           system: t('appheader.theme_system'),

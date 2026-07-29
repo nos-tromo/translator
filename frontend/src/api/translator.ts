@@ -12,3 +12,12 @@ export function translate(req: TranslateRequest, signal?: AbortSignal): Promise<
 export function getVersion(): Promise<{ version: string }> {
   return apiGet<{ version: string }>('/version') // → GET /api/v1/version
 }
+
+export interface Whoami {
+  username: string | null
+  display_name: string | null
+}
+
+export function getWhoami(): Promise<Whoami> {
+  return apiGet<Whoami>('/whoami') // → GET /api/v1/whoami
+}
