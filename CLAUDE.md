@@ -32,7 +32,7 @@ fourth app: own repo, own release cycle, joins `inference-net`, no
 
 ## Commands
 
-This project uses `uv` (Python 3.11+). All commands run inside this directory.
+This project uses `uv` (Python 3.11). All commands run inside this directory.
 
 ```bash
 # Install backend deps
