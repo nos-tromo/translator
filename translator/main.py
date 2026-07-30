@@ -9,6 +9,8 @@ Exposes endpoints under ``/api/v1``:
   human-readable names sourced from ``language_map.json``.
 * ``GET /version`` — returns the running app version.
 * ``GET /config`` — returns the SPA bootstrap config (UI language).
+* ``GET /whoami`` — echoes the gateway's trusted identity headers
+  (``X-Auth-User``/``X-Auth-Name``), for display only.
 * ``GET /health`` — liveness probe.
 
 A single :class:`~translator.engine.Translator` instance is created at startup;
@@ -23,7 +25,7 @@ from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import cast
 
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, Header, HTTPException
 from loguru import logger
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field, field_validator
@@ -147,6 +149,20 @@ class ConfigResponse(BaseModel):
     language: str
 
 
+class WhoamiResponse(BaseModel):
+    """Signed-in identity, echoed from the gateway's trusted headers.
+
+    Attributes:
+        username: Value of the ``X-Auth-User`` header, or ``None`` outside
+            the gateway (dev).
+        display_name: Value of the ``X-Auth-Name`` header (Authelia
+            displayname), or ``None`` when absent.
+    """
+
+    username: str | None
+    display_name: str | None
+
+
 def _load_language_codes(
     filename: str = "language_map.json",
 ) -> dict[str, str]:
@@ -267,6 +283,28 @@ def get_version() -> dict[str, str]:
 def get_config() -> ConfigResponse:
     """Return the SPA bootstrap config (UI language). Unauthenticated, like /health."""
     return ConfigResponse(language=load_ui_language())
+
+
+@router.get("/whoami", summary="Signed-in identity", tags=["Metadata"])
+def get_whoami(
+    x_auth_user: str | None = Header(default=None),
+    x_auth_name: str | None = Header(default=None),
+) -> WhoamiResponse:
+    """Echo the gateway's trusted identity headers, for the SPA's AppHeader.
+
+    translator has no principal seam (unlike chorus/docint/Nextext): this is
+    purely decorative header-echo for display, not an authorization gate, so
+    it stays unauthenticated like ``/version`` and ``/config`` — both fields
+    are ``None`` outside the gateway (dev) rather than a 401.
+
+    Args:
+        x_auth_user: The ``X-Auth-User`` header, if present.
+        x_auth_name: The ``X-Auth-Name`` header (Authelia displayname), if present.
+
+    Returns:
+        A :class:`WhoamiResponse` with both header values (or ``None``).
+    """
+    return WhoamiResponse(username=x_auth_user, display_name=x_auth_name)
 
 
 @router.get(
