@@ -3,7 +3,7 @@
 Wraps the OpenAI Python client to call an instruction-tuned model (e.g.
 Gemma-class) served by any OpenAI-compatible inference backend. Language
 detection is delegated to the same model; country flag emojis are resolved
-via ``langcodes``, ``pycountry``, and ``emoji-country-flag``.
+via ``langcodes`` and ``emoji-country-flag``.
 """
 
 import logging
@@ -11,7 +11,6 @@ import os
 import re
 
 import flag
-import pycountry
 from langcodes import Language
 from openai import OpenAI
 
@@ -118,6 +117,25 @@ class Translator:
             self.logger.error(f"Error converting language to country flag: {e}")
             return ""
 
+    @staticmethod
+    def _english_language_name(code: str) -> str:
+        """Resolve an ISO 639-1 code to its English display name via ``langcodes``.
+
+        Args:
+            code: ISO 639-1 language code (e.g. ``"fr"``).
+
+        Returns:
+            The English language name (e.g. ``"French"``), or the raw ``code``
+            when it is not a known language tag.
+        """
+        try:
+            lang = Language.get(code)
+            if not lang.is_valid():
+                return code
+            return lang.display_name("en")
+        except Exception:
+            return code
+
     def get_language_info(self, code: str) -> dict[str, str]:
         """Return the display name and flag emoji for an ISO 639-1 language code.
 
@@ -130,8 +148,7 @@ class Translator:
             the name and an empty string as the flag if the code is not found.
         """
         try:
-            lang_obj = pycountry.languages.get(alpha_2=code)
-            lang_name = lang_obj.name if lang_obj else code
+            lang_name = self._english_language_name(code)
             country_flag = self._get_country_flag(lang_name)
             return {"name": lang_name, "flag": country_flag}
         except Exception as e:
@@ -173,8 +190,7 @@ class Translator:
             src_lang_code = _parse_iso_code(content)
             if src_lang_code is None:
                 raise RuntimeError(f"No ISO 639-1 code found in detection response: {content!r}")
-            src_lang_obj = pycountry.languages.get(alpha_2=src_lang_code)
-            src_lang_name = src_lang_obj.name if src_lang_obj else src_lang_code
+            src_lang_name = self._english_language_name(src_lang_code)
             country_flag = self._get_country_flag(src_lang_name)
             return {"code": src_lang_code, "name": src_lang_name, "flag": country_flag}
         except Exception as e:
