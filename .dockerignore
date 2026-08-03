@@ -8,11 +8,15 @@
 # Backend build artifacts and caches
 **/__pycache__/
 **/*.egg-info/
+**/.claire/
 **/.claude/
 **/.github/
 **/.logs/
+**/.mypy_cache/
 **/.pre-commit-cache/
 **/.pytest_cache/
+**/.remember/
+**/.superpowers/
 **/.ruff_cache/
 **/.uv-cache/
 **/.venv/
