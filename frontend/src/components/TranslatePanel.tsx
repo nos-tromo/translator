@@ -69,22 +69,18 @@ export function TranslatePanel() {
         />
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-2">
-        <div className="flex min-h-72 flex-col gap-2">
-          <textarea
-            aria-label={t('panel.text_aria')}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={t('panel.text_placeholder')}
-            className="min-h-0 w-full flex-1 resize-none rounded-lg border border-border bg-muted p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          />
-          <FileTextInput onText={setText} onError={setFileError} />
-          {fileError && <Banner variant="danger">{fileError}</Banner>}
-        </div>
+      <div className="grid max-h-[32rem] min-h-0 flex-1 gap-4 md:grid-cols-2">
+        <textarea
+          aria-label={t('panel.text_aria')}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={t('panel.text_placeholder')}
+          className="h-full min-h-72 w-full resize-none rounded-lg border border-border bg-muted p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        />
         <OutputField value={result?.translation ?? ''} placeholder={t('panel.output_placeholder')} />
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button
           type="button"
           onClick={onTranslate}
@@ -92,8 +88,11 @@ export function TranslatePanel() {
         >
           {t('panel.translate')}
         </Button>
+        <FileTextInput onText={setText} onError={setFileError} />
         {translation.isPending && <Spinner label={t('panel.translating')} />}
       </div>
+
+      {fileError && <Banner variant="danger">{fileError}</Banner>}
 
       {translateError && <Banner variant="danger">{t(translateError.key, translateError.vars)}</Banner>}
       {result && (
