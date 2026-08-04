@@ -4,6 +4,11 @@ export const en = {
   'appheader.theme_system': 'system',
   'appheader.theme_light': 'light',
   'appheader.theme_dark': 'dark',
+  'appheader.sign_out': 'Sign out',
+
+  // page
+  'page.title': 'Translate',
+  'page.caption': 'Text translation',
 
   // common
   'common.copied': 'Copied',

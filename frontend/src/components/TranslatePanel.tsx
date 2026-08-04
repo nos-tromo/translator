@@ -50,7 +50,7 @@ export function TranslatePanel() {
   const translateError = translation.error ? describeError(translation.error) : null
   const result = translation.data
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="grid gap-4 md:grid-cols-2">
         <LanguageSelect
           id="source"
@@ -69,16 +69,17 @@ export function TranslatePanel() {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
+      <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-2">
+        <div className="flex min-h-72 flex-col gap-2">
           <textarea
             aria-label={t('panel.text_aria')}
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={t('panel.text_placeholder')}
-            className="h-72 w-full resize-none rounded-md border border-border bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="min-h-0 w-full flex-1 resize-none rounded-lg border border-border bg-muted p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           />
           <FileTextInput onText={setText} onError={setFileError} />
+          {fileError && <Banner variant="danger">{fileError}</Banner>}
         </div>
         <OutputField value={result?.translation ?? ''} placeholder={t('panel.output_placeholder')} />
       </div>
@@ -94,7 +95,6 @@ export function TranslatePanel() {
         {translation.isPending && <Spinner label={t('panel.translating')} />}
       </div>
 
-      {fileError && <Banner variant="danger">{fileError}</Banner>}
       {translateError && <Banner variant="danger">{t(translateError.key, translateError.vars)}</Banner>}
       {result && (
         <DetectedLanguageBanner

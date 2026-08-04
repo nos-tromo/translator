@@ -24,27 +24,27 @@ describe('App', () => {
   it('renders exactly one header row, with the version shown in it', async () => {
     getWhoami.mockResolvedValue({ username: null, display_name: null })
     render(<App />)
-    expect(await screen.findByTestId('appheader-version')).toHaveTextContent('v1.2.3')
+    expect(await screen.findByText('v1.2.3')).toBeInTheDocument()
     expect(screen.getAllByRole('banner')).toHaveLength(1)
     expect(await screen.findByTestId('translate-panel')).toBeInTheDocument()
   })
 
-  it('shows the display name in the header when whoami resolves one', async () => {
+  it('shows the user menu with the display name when whoami resolves one', async () => {
     getWhoami.mockResolvedValue({ username: 'alex', display_name: 'Alex Example' })
     render(<App />)
-    expect(await screen.findByTestId('appheader-user')).toHaveTextContent('Alex Example')
+    expect(await screen.findByRole('button', { name: /Alex Example/ })).toBeInTheDocument()
   })
 
-  it('falls back to username when whoami has no display name', async () => {
+  it('falls back to username in the user menu when whoami has no display name', async () => {
     getWhoami.mockResolvedValue({ username: 'alex', display_name: null })
     render(<App />)
-    expect(await screen.findByTestId('appheader-user')).toHaveTextContent('alex')
+    expect(await screen.findByRole('button', { name: /alex/ })).toBeInTheDocument()
   })
 
-  it('omits the user block when whoami has neither field', async () => {
+  it('omits the user menu when whoami has neither field', async () => {
     getWhoami.mockResolvedValue({ username: null, display_name: null })
     render(<App />)
-    await screen.findByTestId('appheader-version')
-    expect(screen.queryByTestId('appheader-user')).not.toBeInTheDocument()
+    await screen.findByText('v1.2.3')
+    expect(screen.queryByRole('button', { name: /account/i })).toBeNull()
   })
 })
