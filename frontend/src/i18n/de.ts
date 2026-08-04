@@ -6,6 +6,11 @@ export const de: Strings = {
   'appheader.theme_system': 'System',
   'appheader.theme_light': 'Hell',
   'appheader.theme_dark': 'Dunkel',
+  'appheader.sign_out': 'Abmelden',
+
+  // page
+  'page.title': 'Übersetzen',
+  'page.caption': 'Textübersetzung',
 
   // common
   'common.copied': 'Kopiert',
