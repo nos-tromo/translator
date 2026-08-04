@@ -12,8 +12,9 @@ function AppContent() {
     queryFn: getVersion,
     staleTime: Infinity,
   })
-  // Loading and error states both resolve to `undefined` so the header
-  // simply omits the user block rather than showing a stale/error placeholder.
+  // Loading and error states both resolve to `undefined` so the shell
+  // omits the user menu when whoami is unresolved; auth is still verified
+  // by the trusted X-Auth-User header from the edge gateway upstream.
   const { data: whoami } = useQuery({
     queryKey: ['whoami'],
     queryFn: getWhoami,
@@ -34,7 +35,7 @@ function AppContent() {
       }}
       signOutLabel={t('appheader.sign_out')}
     >
-      <div className="flex h-full min-h-0 flex-col p-8">
+      <div className="flex min-h-full flex-col p-8">
         <PageHeader title={t('page.title')} caption={t('page.caption')} />
         <TranslatePanel />
       </div>
