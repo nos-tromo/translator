@@ -10,7 +10,7 @@ interface OutputFieldProps {
 export function OutputField({ value, placeholder }: OutputFieldProps) {
   const t = useT()
   return (
-    <div className="group relative h-72 overflow-auto rounded-md border border-border bg-muted/30 p-3">
+    <div className="group relative h-full min-h-72 overflow-auto rounded-lg border border-border bg-muted p-3">
       {value ? (
         <p className="whitespace-pre-wrap text-sm text-foreground">{value}</p>
       ) : (
