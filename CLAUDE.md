@@ -64,8 +64,8 @@ make bundle                          # ship images as a .tar.gz built from the l
 make bundle-dev                      # ship images as a .tar.gz of the current working tree (dev/soak)
 ```
 
-The SPA is at `http://localhost:${TRANSLATOR_HOST_PORT:-8501}` (dev overlay
-maps the host port to the frontend container's nginx on :80); the FastAPI docs
+The SPA is at `http://localhost:${TRANSLATOR_FRONTEND_HOST_PORT:-8501}` (dev
+overlay maps the host port to the frontend container's nginx on :8080); the FastAPI docs
 at `http://localhost:8000/docs` (dev overlay only — base `docker/compose.yaml`
 does not publish host ports). In pure local dev (`pnpm dev`) the SPA is on
 :5173 and Vite proxies `/api` to the backend.
@@ -73,6 +73,17 @@ does not publish host ports). In pure local dev (`pnpm dev`) the SPA is on
 > The React SPA lives in `frontend/` (Vite + TypeScript + `@infra/ui`), built
 > to static assets and served by nginx, which reverse-proxies `/api/*` to the
 > backend — so the browser is same-origin and the backend runs no CORS.
+
+## Container hardening (deploy ADR 0001)
+
+Both containers run non-root with read-only root filesystems: the backend as
+uid `10001` (`app`, `HOME=/home/app`), the frontend on
+`nginxinc/nginx-unprivileged` as uid `101` listening on **:8080** (the edge
+gateway's `translator-frontend` upstream must match). Compose applies
+`no-new-privileges`, `cap_drop: ALL`, `read_only: true`, and a `/tmp` tmpfs to
+both services via the `x-hardened` anchor. The backend writes nothing to disk;
+keep it that way — any new writable path needs an explicit tmpfs or volume and
+a note here.
 
 ## Architecture
 
@@ -120,7 +131,7 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
 | `OPENAI_TIMEOUT` | No | `60` | Per-request timeout in seconds |
 | `TEXT_MODEL` | Yes | — (compose fallback: `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`) | Model identifier passed in every chat completions request (translation + language detection — use an instruction-tuned model). Never hardcoded in Python — the fallback lives only in `docker/compose.yaml` |
 | `DEFAULT_TARGET_LANGUAGE` | No (build) | `English` | Default target language; passed as the `VITE_DEFAULT_TARGET_LANGUAGE` build arg and baked into the SPA at image build |
-| `TRANSLATOR_HOST_PORT` | No | `8501` | Dev-only host port; mapped to the frontend container's nginx on :80 |
+| `TRANSLATOR_FRONTEND_HOST_PORT` | No | `8501` | Dev-only host port; mapped to the frontend container's nginx on :8080 |
 | `INFERENCE_NETWORK` | No | `inference-net` | External Docker network name to join |
 | `LOG_LEVEL` | No | `INFO` | Minimum log level emitted on stderr |
 | `EXTRA_NO_PROXY` | No | — | Comma-separated hostnames appended to `NO_PROXY`; must start with `,` |
