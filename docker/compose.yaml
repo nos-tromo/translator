@@ -28,13 +28,28 @@ x-logging: &default-logging
     max-file: "5"
     compress: "true"
 
+##########################################################
+# Shared hardening (deploy ADR 0001) — no privilege
+# escalation, no capabilities; both images run non-root
+# with read-only root filesystems.
+##########################################################
+x-hardened: &hardened
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
 services:
   backend:
+    <<: *hardened
     image: translator-backend:${TRANSLATOR_VERSION:-latest}
     build:
       context: ..
       dockerfile: docker/Dockerfile.backend
     logging: *default-logging
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
     environment:
       <<: *no-proxy-env
       OPENAI_API_BASE: ${OPENAI_API_BASE}
@@ -67,6 +82,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    <<: *hardened
     image: translator-frontend:${TRANSLATOR_VERSION:-latest}
     build:
       context: ..
@@ -74,6 +90,10 @@ services:
       args:
         VITE_DEFAULT_TARGET_LANGUAGE: ${DEFAULT_TARGET_LANGUAGE:-English}
     logging: *default-logging
+    # nginx (unprivileged image) writes pid + temp files under /tmp only.
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
     environment:
       <<: *no-proxy-env
     networks:
@@ -87,7 +107,7 @@ services:
       backend:
         condition: service_healthy
     expose:
-      - "80"
+      - "8080"
     restart: unless-stopped
 
 networks:

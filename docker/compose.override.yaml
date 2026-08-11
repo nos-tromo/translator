@@ -13,4 +13,4 @@ services:
       - "${TRANSLATOR_BACKEND_HOST_PORT:-8000}:8000"
   frontend:
     ports:
-      - "${TRANSLATOR_FRONTEND_HOST_PORT:-8501}:80"
+      - "${TRANSLATOR_FRONTEND_HOST_PORT:-8501}:8080"
