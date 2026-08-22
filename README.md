@@ -1,6 +1,13 @@
 # Translator
 
-A self-hosted translation service powered by an instruction-tuned LLM (e.g. a Gemma-class model, configurable via `TEXT_MODEL`) via an OpenAI-compatible inference backend (e.g. [Ollama](https://ollama.com)). The same model performs source-language detection — no local detection library.
+A self-hosted translation service: paste text, pick a target language, get the
+translation back. It is a thin wrapper around an instruction-tuned LLM served
+over an OpenAI-compatible endpoint — the same model performs source-language
+detection, so there is no local detection library and no model weights ship
+with this repo.
+
+It is one of the four application members of the nos-tromo federation and
+reaches inference over the shared `inference-net` network.
 
 ## Architecture
 
@@ -9,31 +16,30 @@ A self-hosted translation service powered by an instruction-tuned LLM (e.g. a Ge
 | Backend | `translator/main.py` | FastAPI app — `POST /translate`, `GET /languages` |
 | Engine | `translator/engine.py` | `Translator` class — language detection, flag lookup, LLM call |
 | Frontend | `frontend/` | React SPA (Vite + `@infra/ui`), served by nginx; speaks HTTP to the backend |
-| Language map | `translator/language_map.json` | ~50 language codes → human-readable names |
+| Language map | `translator/language_map.json` | ~50 language codes to human-readable names |
 
 ## Prerequisites
 
-An OpenAI-compatible inference server with an instruction-tuned model loaded
-(it must follow instructions reliably — it handles both translation and
-source-language detection). With Ollama:
+- Docker, for the containerized setup
+- Python 3.11 and `uv`, for local development
+- An OpenAI-compatible inference endpoint with an instruction-tuned model
+  loaded. In the federation that is the shared LiteLLM router
+  (`http://vllm-router:4000/v1`); standalone, anything OpenAI-compatible works.
+  See [docs/configuration.md](docs/configuration.md#inference-provider-setup).
+
+## Quick start
 
 ```bash
-# Create Docker network and persistent cache
-docker network create inference-net
-docker volume create ollama-cache
-
-# Run the Ollama service
-docker run -d \
-  --network inference-net \
-  --name ollama \
-  --gpus all \
-  -v ollama-cache:/root/.ollama \
-  -p 11434:11434 \
-  ollama/ollama:0.20.2
-
-# Preload the translation model (any instruction-tuned Gemma-class model)
-docker exec ollama ollama pull <model>
+cp .env.example .env    # set OPENAI_API_BASE and TEXT_MODEL
+make dev                # build, then start backend + SPA detached with host ports
 ```
+
+App: `http://localhost:${TRANSLATOR_FRONTEND_HOST_PORT:-8501}`
+
+`make dev` layers the dev overlay so host ports are published. `make up` runs
+the base compose file alone — the production shape, no host ports. The compose
+file expects an external Docker network named `inference-net` (configurable
+via `INFERENCE_NETWORK`).
 
 ## Local development
 
@@ -42,37 +48,43 @@ uv sync --group dev
 
 # Backend (FastAPI)
 OPENAI_API_BASE=http://localhost:11434/v1 TEXT_MODEL=<model> uv run uvicorn translator.main:app --reload
-# API docs → http://127.0.0.1:8000/docs
+# API docs at http://127.0.0.1:8000/docs
 
 # Frontend (React SPA) — in a second terminal
 cd frontend && pnpm install && pnpm dev
-# UI → http://localhost:5173 (Vite dev server proxies /api to the backend on :8000)
+# UI at http://localhost:5173 (Vite proxies /api to the backend on :8000)
 ```
 
-## Docker
+## Configuration
+
+Two variables are required; the rest have working defaults.
+
+| Variable | Required | Description |
+|---|---|---|
+| `OPENAI_API_BASE` | Yes | Base URL of the OpenAI-compatible endpoint — must include `/v1` |
+| `TEXT_MODEL` | Yes | Model identifier for translation and language detection |
+| `RESPONSE_LANGUAGE` | No | SPA interface language, `en` (default) or `de` |
+
+The full table lives in [docs/configuration.md](docs/configuration.md).
+
+## Operating
 
 ```bash
-make dev   # build, then start backend and the React SPA detached, publishing host ports
+make help    # every target with a one-line description
+make test    # pytest, then the frontend's vitest suite
+make verify  # the pre-push gate: pre-commit (ruff + pyrefly), pnpm lint, pnpm build
 ```
 
-App → `http://localhost:${TRANSLATOR_HOST_PORT:-8501}`
+## Documentation
 
-The compose file expects an external Docker network named `inference-net` (configurable via `INFERENCE_NETWORK`) with an Ollama container reachable as `ollama`.
+- [Configuration](docs/configuration.md) — every environment variable, the
+  inference-provider setup, and the production `/translator/` sub-path.
+- `CLAUDE.md` — architecture detail and the design decisions behind the
+  engine, kept for contributors and coding agents.
+- Design history lives in `docs/` alongside, in dated design and plan files.
 
-## Environment variables
+## Pointers
 
-Copy `.env.example` to `.env` and fill in your values.
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `OPENAI_API_BASE` | Yes | — | Base URL of the OpenAI-compatible endpoint — must include `/v1` (e.g. `http://localhost:11434/v1`) |
-| `OPENAI_API_KEY` | No | `ollama` | API key (`ollama` works for local Ollama servers) |
-| `TEXT_MODEL` | Yes | — (compose fallback: `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`) | Model identifier for translation + language detection |
-| `DEFAULT_TARGET_LANGUAGE` | No | `English` | Build-time default target language, baked into the SPA via the `VITE_DEFAULT_TARGET_LANGUAGE` build arg |
-| `RESPONSE_LANGUAGE` | No | `en` | UI language switch — `en` (English) or `de` (Deutsch). Drives the SPA interface only; the translation target language is unaffected |
-
-## Tests
-
-```bash
-uv run pytest
-```
+- Inference is provided by [vllm-service](https://github.com/nos-tromo/vllm-service);
+  the production entry point is [edge-plane](https://github.com/nos-tromo/edge-plane).
+- Questions and bugs: <https://github.com/nos-tromo/translator/issues>
