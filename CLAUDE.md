@@ -120,7 +120,7 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
 - `compose.yaml` — production shape: services on `translator-net` (internal)
   + `inference-net` (external, shared); no host ports.
 - `compose.override.yaml` — dev overlay that publishes 8000 (backend) and
-  `${TRANSLATOR_HOST_PORT:-8501}` (frontend).
+  `${TRANSLATOR_FRONTEND_HOST_PORT:-8501}` (frontend).
 
 ## Environment Variables
 
