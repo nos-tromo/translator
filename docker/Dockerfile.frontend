@@ -1,6 +1,4 @@
 # syntax=docker/dockerfile:1
-# Base images are spelled out on the FROM lines (no ARG indirection) so
-# Dependabot's docker updater can see and bump them.
 
 FROM docker.io/library/node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS builder
 WORKDIR /build
@@ -12,8 +10,6 @@ ARG VITE_DEFAULT_TARGET_LANGUAGE=English
 ENV VITE_DEFAULT_TARGET_LANGUAGE=${VITE_DEFAULT_TARGET_LANGUAGE}
 RUN pnpm build
 
-# nginx-unprivileged: runs as uid 101, listens on 8080, re-paths pid and
-# temp dirs under /tmp (deploy ADR 0001 non-root mandate).
 FROM docker.io/nginxinc/nginx-unprivileged:1.27-alpine@sha256:65e3e85dbaed8ba248841d9d58a899b6197106c23cb0ff1a132b7bfe0547e4c0
 USER root
 RUN rm /etc/nginx/conf.d/default.conf
