@@ -119,10 +119,18 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
 
 **Docker shape** (`docker/`):
 
-- `Dockerfile.backend` — multi-stage uv build, runs `uvicorn translator.main:app`.
-- `Dockerfile.frontend` — two-stage build: `node:20-alpine` builds the Vite SPA,
-  `nginxinc/nginx-unprivileged:1.27-alpine` serves the static assets as uid 101
-  on :8080 and proxies `/api` to the backend.
+- `Dockerfile.backend` — multi-stage uv build on the `python:3.11-slim-trixie`
+  line, runs `uvicorn translator.main:app`. That interpreter line is fixed by
+  `requires-python`, so Dependabot refreshes only its digest
+  (`.github/dependabot.yml` ignores minor/major bumps of `library/python`);
+  moving to another Python is a deliberate migration, never an automated bump.
+- `Dockerfile.frontend` — two-stage build: the current `node:*-alpine` builds the
+  Vite SPA (pnpm is installed with `npm install -g pnpm@<pin>` — Node ≥25 images
+  ship no Corepack; keep the pin in step with `packageManager` in
+  `frontend/package.json` and `pnpm-version` in `.github/workflows/ci.yml`),
+  `nginxinc/nginx-unprivileged:*-alpine` serves the static assets as uid 101
+  on :8080 and proxies `/api` to the backend. Both frontend images move freely
+  with Dependabot.
 - `compose.yaml` — production shape: both services on `translator-net`
   (internal); the backend additionally on `inference-net` and the frontend on
   `edge-net` (both external, shared). No host ports.
