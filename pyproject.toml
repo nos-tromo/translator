@@ -14,10 +14,10 @@ dependencies = [
     "fastapi>=0.141.1",
     "langcodes[data]>=3.5.1",
     "loguru>=0.7.3",
-    "openai>=3.13.0",
+    "openai>=3.14.1",
     "prometheus-fastapi-instrumentator>=8.1.0",
     "pydantic>=2.13.5",
-    "uvicorn>=0.52.4",
+    "uvicorn>=0.53.0",
 ]
 
 [project.urls]
