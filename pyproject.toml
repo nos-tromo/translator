@@ -11,13 +11,13 @@ license = "Apache-2.0"
 dependencies = [
     "dotenv>=0.9.9",
     "emoji-country-flag>=2.1.0",
-    "fastapi>=0.141.1",
+    "fastapi>=0.142.2",
     "langcodes[data]>=3.5.1",
     "loguru>=0.7.3",
-    "openai>=3.19.2",
+    "openai>=3.22.1",
     "prometheus-fastapi-instrumentator>=8.1.0",
     "pydantic>=2.13.5",
-    "uvicorn>=0.53.0",
+    "uvicorn>=0.54.0",
 ]
 
 [project.urls]
