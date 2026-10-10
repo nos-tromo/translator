@@ -1,7 +1,7 @@
 [project]
 name = "translator"
 version = "1.5.10"
-description = "Simple translation tool."
+description = "Self-hosted text translation service — FastAPI + React over an OpenAI-compatible LLM"
 authors = [
   { name = "nos-tromo" }
 ]
