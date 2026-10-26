@@ -11,10 +11,10 @@ license = "Apache-2.0"
 dependencies = [
     "dotenv>=0.9.9",
     "emoji-country-flag>=2.1.0",
-    "fastapi>=0.143.0",
+    "fastapi>=0.148.0",
     "langcodes[data]>=3.5.1",
     "loguru>=0.7.3",
-    "openai>=3.29.0",
+    "openai>=3.35.1",
     "prometheus-fastapi-instrumentator>=8.1.0",
     "pydantic>=2.14.1",
     "uvicorn>=0.54.0",
@@ -25,7 +25,7 @@ Repository = "https://github.com/nos-tromo/translator.git"
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.6.2",
+    "pre-commit>=4.7.0",
     "pyrefly==1.1.1",
     "pytest>=9.1.1",
     "ruff==0.15.14",
