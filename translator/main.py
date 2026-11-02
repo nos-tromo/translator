@@ -9,8 +9,9 @@ Exposes endpoints under ``/api/v1``:
   human-readable names sourced from ``language_map.json``.
 * ``GET /version`` — returns the running app version.
 * ``GET /config`` — returns the SPA bootstrap config (UI language).
-* ``GET /whoami`` — echoes the gateway's trusted identity headers
-  (``X-Auth-User``/``X-Auth-Name``), for display only.
+* ``GET /whoami`` — echoes the gateway's identity headers
+  (``X-Auth-User``/``X-Auth-Name``) as far as they are trusted (see
+  :mod:`translator.identity`), for display only.
 * ``GET /health`` — liveness probe.
 
 A single :class:`~translator.engine.Translator` instance is created at startup;
@@ -25,12 +26,13 @@ from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import cast
 
-from fastapi import APIRouter, FastAPI, Header, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException, Request
 from loguru import logger
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field, field_validator
 
 from translator.engine import Translator
+from translator.identity import get_edge_secret, resolve_identity
 from translator.log_cfg import setup_logger
 
 setup_logger()
@@ -77,6 +79,8 @@ app = FastAPI(
 # backend, so requests are never cross-origin and no CORS policy is needed.
 router = APIRouter(prefix="/api/v1")
 translator = Translator()
+# Startup check: a too-short TRANSLATOR_EDGE_SECRET fails the import here; unset logs one warning.
+get_edge_secret()
 
 # Aggregate-only request metrics (method, path template, status, latency) for
 # the obs-plane Prometheus scrape target. No request/response bodies — so no
@@ -150,13 +154,13 @@ class ConfigResponse(BaseModel):
 
 
 class WhoamiResponse(BaseModel):
-    """Signed-in identity, echoed from the gateway's trusted headers.
+    """Signed-in identity, echoed from the gateway's identity headers.
 
     Attributes:
-        username: Value of the ``X-Auth-User`` header, or ``None`` outside
-            the gateway (dev).
+        username: Value of the ``X-Auth-User`` header, or ``None`` when absent
+            (dev) or not trusted.
         display_name: Value of the ``X-Auth-Name`` header (Authelia
-            displayname), or ``None`` when absent.
+            displayname), or ``None`` when absent or not trusted.
     """
 
     username: str | None
@@ -286,25 +290,25 @@ def get_config() -> ConfigResponse:
 
 
 @router.get("/whoami", summary="Signed-in identity", tags=["Metadata"])
-def get_whoami(
-    x_auth_user: str | None = Header(default=None),
-    x_auth_name: str | None = Header(default=None),
-) -> WhoamiResponse:
-    """Echo the gateway's trusted identity headers, for the SPA's AppHeader.
+def get_whoami(request: Request) -> WhoamiResponse:
+    """Echo the gateway's identity headers, for the SPA's AppHeader.
 
     translator has no principal seam (unlike chorus/docint/Nextext): this is
     purely decorative header-echo for display, not an authorization gate, so
     it stays unauthenticated like ``/version`` and ``/config`` — both fields
-    are ``None`` outside the gateway (dev) rather than a 401.
+    are ``None`` outside the gateway (dev) rather than a 401. The headers are
+    read through :func:`~translator.identity.resolve_identity`, so with
+    ``TRANSLATOR_EDGE_SECRET`` set, a request without the matching
+    ``X-Edge-Secret`` gets the same answer as one without identity headers.
 
     Args:
-        x_auth_user: The ``X-Auth-User`` header, if present.
-        x_auth_name: The ``X-Auth-Name`` header (Authelia displayname), if present.
+        request: The incoming request.
 
     Returns:
-        A :class:`WhoamiResponse` with both header values (or ``None``).
+        A :class:`WhoamiResponse` with both trusted header values (or ``None``).
     """
-    return WhoamiResponse(username=x_auth_user, display_name=x_auth_name)
+    identity = resolve_identity(request)
+    return WhoamiResponse(username=identity.username, display_name=identity.display_name)
 
 
 @router.get(

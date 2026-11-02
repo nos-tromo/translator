@@ -102,6 +102,9 @@ translator/                       # the importable package
                  detection (a small second completions call on a bounded text
                  prefix). Uses pycountry/langcodes/emoji-country-flag for
                  display metadata.
+  identity.py    resolve_identity(): the one place that decides whether the
+                 gateway's X-Auth-User / X-Auth-Name are trusted, by checking
+                 X-Edge-Secret against TRANSLATOR_EDGE_SECRET.
   log_cfg.py     Loguru setup (stderr only; container driver rotates), plus
                  the filter that drops query strings from uvicorn's access log.
   language_map.json
@@ -149,6 +152,7 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
 | `TEXT_MODEL` | Yes | — (compose fallback: `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`) | Model identifier passed in every chat completions request (translation + language detection — use an instruction-tuned model). Never hardcoded in Python — the fallback lives only in `docker/compose.yaml` |
 | `DEFAULT_TARGET_LANGUAGE` | No (build) | `English` | Default target language; passed as the `VITE_DEFAULT_TARGET_LANGUAGE` build arg and baked into the SPA at image build |
 | `RESPONSE_LANGUAGE` | No | `en` | SPA interface language, `en` or `de`; UI chrome only — the translation target stays a per-request choice |
+| `TRANSLATOR_EDGE_SECRET` | No | — | Secret shared with the edge gateway, sent as `X-Edge-Secret`. Set (≥ 32 characters, else startup fails): identity headers count only on requests carrying it. Unset: trusted from any caller, one startup warning. See `docs/configuration.md` |
 | `TRANSLATOR_FRONTEND_HOST_PORT` | No | `8501` | Dev-only host port; mapped to the frontend container's nginx on :8080 |
 | `TRANSLATOR_BACKEND_HOST_PORT` | No | `8000` | Dev-only host port for the FastAPI backend |
 | `INFERENCE_NETWORK` | No | `inference-net` | External Docker network the backend joins |
@@ -205,6 +209,18 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
   `GET /api/v1/whoami`, which echoes both headers back for the SPA's
   AppHeader. It is display-only, never an authorization gate, and stays
   unauthenticated like `/version` and `/config`.
+- **Identity headers count only with the edge secret.** The backend is also
+  on the shared `inference-net`, where any container could send `X-Auth-*`
+  itself. With `TRANSLATOR_EDGE_SECRET` set, the gateway sends the same value
+  in `X-Edge-Secret` (the frontend nginx passes it through), and
+  `identity.py::resolve_identity` trusts the identity headers only on a
+  request whose `X-Edge-Secret` matches (`hmac.compare_digest`). Otherwise it
+  ignores them, as if absent, and logs method and path only — never the
+  secret or a header value. Unset or blank keeps the old trust-any-caller
+  behaviour plus one startup warning; a value under 32 characters fails the
+  import, as a missing `TEXT_MODEL` does. Code that needs the caller's
+  identity calls `resolve_identity` rather than reading the headers. Rollout
+  is gateway first, then the secret here.
 
 ## Git & PR Workflow
 
