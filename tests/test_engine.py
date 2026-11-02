@@ -8,6 +8,7 @@ call would otherwise be made.
 from unittest.mock import MagicMock
 
 import pytest
+from openai import BadRequestError
 
 from translator.engine import DETECTION_PREFIX_LIMIT, Translator
 
@@ -366,3 +367,76 @@ def test_translate_raises_on_non_string_content(translator: Translator) -> None:
 
     with pytest.raises(RuntimeError, match="Translation failed"):
         translator.translate("Hello", "English", "en", "French", "fr")
+
+
+# ── log content ────────────────────────────────────────────────────────────────
+
+# Stands in for input text or model output; it must never reach a log line.
+_SYNTHETIC_MARKER = "zz-synthetic-marker-4817"
+
+
+def _upstream_error(marker: str) -> BadRequestError:
+    """Build the error the OpenAI client raises for an HTTP 400 that quotes ``marker``.
+
+    Args:
+        marker: Synthetic text standing in for request content echoed by the server.
+
+    Returns:
+        BadRequestError: Error whose message and body both contain ``marker``.
+    """
+    body = {"error": {"message": f"rejected input: {marker}"}}
+    return BadRequestError(f"Error code: 400 - {body}", response=MagicMock(status_code=400, headers={}), body=body)
+
+
+def test_detect_language_logs_fixed_reason_not_reply(translator: Translator, caplog: pytest.LogCaptureFixture) -> None:
+    """An unparseable detection reply is logged as a fixed reason, never quoted.
+
+    Args:
+        translator: Translator instance provided by the ``translator`` fixture.
+        caplog: Pytest fixture capturing log records.
+    """
+    _mock_detection_client(translator, f"Sorry, {_SYNTHETIC_MARKER} is all I can offer.")
+    assert translator.detect_language("Lorem ipsum dolor sit amet.") == {"code": "", "name": "", "flag": ""}
+    assert "No ISO 639-1 code found in detection response." in caplog.text
+    assert _SYNTHETIC_MARKER not in caplog.text
+
+
+def test_detect_language_logs_no_upstream_error_body(translator: Translator, caplog: pytest.LogCaptureFixture) -> None:
+    """An upstream API error during detection is logged by type and status only.
+
+    Args:
+        translator: Translator instance provided by the ``translator`` fixture.
+        caplog: Pytest fixture capturing log records.
+    """
+    translator.client = MagicMock()
+    translator.client.chat.completions.create.side_effect = _upstream_error(_SYNTHETIC_MARKER)
+    assert translator.detect_language("Lorem ipsum dolor sit amet.") == {"code": "", "name": "", "flag": ""}
+    assert "BadRequestError (HTTP 400)" in caplog.text
+    assert _SYNTHETIC_MARKER not in caplog.text
+
+
+def test_translate_logs_no_upstream_error_body(translator: Translator, caplog: pytest.LogCaptureFixture) -> None:
+    """An upstream API error during translation is logged by type and status only.
+
+    Args:
+        translator: Translator instance provided by the ``translator`` fixture.
+        caplog: Pytest fixture capturing log records.
+    """
+    translator.client = MagicMock()
+    translator.client.chat.completions.create.side_effect = _upstream_error(_SYNTHETIC_MARKER)
+    with pytest.raises(RuntimeError, match="Translation failed"):
+        translator.translate("Lorem ipsum dolor sit amet.", "English", "en", "French", "fr")
+    assert "BadRequestError (HTTP 400)" in caplog.text
+    assert _SYNTHETIC_MARKER not in caplog.text
+
+
+def test_get_language_info_logs_no_requested_code(translator: Translator, caplog: pytest.LogCaptureFixture) -> None:
+    """A free-form source language that cannot be resolved is not echoed into the log.
+
+    Args:
+        translator: Translator instance provided by the ``translator`` fixture.
+        caplog: Pytest fixture capturing log records.
+    """
+    assert translator.get_language_info(_SYNTHETIC_MARKER) == {"name": _SYNTHETIC_MARKER, "flag": ""}
+    assert "LookupError" in caplog.text
+    assert _SYNTHETIC_MARKER not in caplog.text

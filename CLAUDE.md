@@ -27,8 +27,8 @@ For any non-trivial change (>1 file or any root-cause fix), present a plan and w
 translator is a thin translation service: a FastAPI backend that calls an
 instruction-tuned Gemma-class model via any OpenAI-compatible chat/completions endpoint,
 fronted by a React single-page app (Vite + `@infra/ui`, served by nginx). It
-runs no models of its own — it is a typed, audited, language-aware wrapper
-around an external inference endpoint.
+runs no models of its own — it is a typed, language-aware wrapper around an
+external inference endpoint.
 
 In the nos-tromo federation it sits next to chorus, docint, and Nextext as a
 fourth app: own repo, own release cycle, backend on `inference-net` and
@@ -102,7 +102,8 @@ translator/                       # the importable package
                  detection (a small second completions call on a bounded text
                  prefix). Uses pycountry/langcodes/emoji-country-flag for
                  display metadata.
-  log_cfg.py     Loguru setup (stderr only; container driver rotates).
+  log_cfg.py     Loguru setup (stderr only; container driver rotates), plus
+                 the filter that drops query strings from uvicorn's access log.
   language_map.json
                  Static ISO 639-1 → human-readable name map (~50 entries),
                  mirroring Nextext's translation target-language list.
@@ -184,6 +185,16 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
 - **No volumes at all.** The compose project declares none — logs go to
   the container logging driver — so `make down` (and even
   `docker compose down -v`) is always safe.
+- **Ops logs carry no request content.** No log line holds input text or
+  model output: engine errors log a fixed reason or the exception type via
+  `engine.py::_describe_error`, never an exception message — an upstream
+  error body or a language lookup can quote what it failed on. Access logs
+  hold no query strings: uvicorn's passes through
+  `log_cfg.py::StripQueryStringFilter`, and the frontend nginx writes its own
+  `scrubbed` format (method, path without query, status, bytes, timing,
+  request id — no client IP, referer or user agent). nginx's error log is
+  the exception: on a request-level error, such as an unreachable backend,
+  it still quotes the full request line.
 - **Canonical sub-path `/translator/`.** The SPA is built with Vite `base:
   '/translator/'`; the frontend's own nginx strips that prefix so its
   root-anchored locations apply unchanged, and direct root access 302s to

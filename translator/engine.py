@@ -12,7 +12,7 @@ import re
 
 import flag
 from langcodes import Language
-from openai import OpenAI
+from openai import APIStatusError, OpenAI
 
 # Language detection only needs the beginning of the text; a bounded prefix
 # keeps the detection call cheap regardless of input size.
@@ -22,6 +22,32 @@ DETECTION_PREFIX_LIMIT = 500
 # bare two-letter token is only trusted when it is the whole reply, because
 # English filler words ("is", "in", "it") collide with valid ISO 639-1 codes.
 _PARENTHESISED_CODE_RE = re.compile(r"\(\s*[\"']?([a-z]{2})[\"']?\s*\)")
+
+
+class _FixedReasonError(RuntimeError):
+    """Engine failure raised with a literal message, so the message is safe to log."""
+
+
+def _describe_error(exc: BaseException) -> str:
+    """Summarise an exception for the log without echoing request or model content.
+
+    Third-party exception messages can quote what they failed on: an upstream
+    API error carries the response body, a language lookup quotes the name it
+    could not resolve. So only the exception type is logged, plus the HTTP
+    status of an upstream API error. The engine's own
+    :class:`_FixedReasonError` messages are literals and are logged as-is.
+
+    Args:
+        exc: The exception to describe.
+
+    Returns:
+        A short description containing no input text or model output.
+    """
+    if isinstance(exc, _FixedReasonError):
+        return str(exc)
+    if isinstance(exc, APIStatusError):
+        return f"{type(exc).__name__} (HTTP {exc.status_code})"
+    return type(exc).__name__
 
 
 def _parse_iso_code(reply: str) -> str | None:
@@ -114,7 +140,7 @@ class Translator:
             country_code = lang.maximize().region
             return flag.flag(country_code) if country_code else ""
         except Exception as e:
-            self.logger.error(f"Error converting language to country flag: {e}")
+            self.logger.error(f"Error converting language to country flag: {_describe_error(e)}")
             return ""
 
     @staticmethod
@@ -152,7 +178,7 @@ class Translator:
             country_flag = self._get_country_flag(lang_name)
             return {"name": lang_name, "flag": country_flag}
         except Exception as e:
-            self.logger.error(f"Error looking up language info for '{code}': {e}")
+            self.logger.error(f"Error looking up language info: {_describe_error(e)}")
             return {"name": code, "flag": ""}
 
     def detect_language(self, text: str) -> dict[str, str]:
@@ -186,15 +212,15 @@ class Translator:
             )
             content = response.choices[0].message.content
             if not isinstance(content, str):
-                raise RuntimeError("Language detection response did not contain text content.")
+                raise _FixedReasonError("Language detection response did not contain text content.")
             src_lang_code = _parse_iso_code(content)
             if src_lang_code is None:
-                raise RuntimeError(f"No ISO 639-1 code found in detection response: {content!r}")
+                raise _FixedReasonError("No ISO 639-1 code found in detection response.")
             src_lang_name = self._english_language_name(src_lang_code)
             country_flag = self._get_country_flag(src_lang_name)
             return {"code": src_lang_code, "name": src_lang_name, "flag": country_flag}
         except Exception as e:
-            self.logger.error(f"Error detecting language: {e}")
+            self.logger.error(f"Error detecting language: {_describe_error(e)}")
             return {"code": "", "name": "", "flag": ""}
 
     def translate(
@@ -228,7 +254,7 @@ class Translator:
         """
         try:
             if not text:
-                raise ValueError("Input text cannot be empty.")
+                raise _FixedReasonError("Input text cannot be empty.")
 
             if src_lang_name:
                 prompt = (
@@ -257,8 +283,8 @@ class Translator:
 
             content = response.choices[0].message.content
             if not isinstance(content, str):
-                raise RuntimeError("Translation response did not contain text content.")
+                raise _FixedReasonError("Translation response did not contain text content.")
             return content.strip()
         except Exception as e:
-            self.logger.error(f"Error during translation: {e}")
+            self.logger.error(f"Error during translation: {_describe_error(e)}")
             raise RuntimeError("Translation failed") from e
