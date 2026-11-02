@@ -41,6 +41,12 @@ Host ports come from `docker/compose.override.yaml`, the dev overlay that
 `make up-dev` layers on. The base `docker/compose.yaml` is the production
 shape and publishes nothing.
 
+Logs go to the containers' stdout/stderr. No log line carries input text or
+model output. The backend and nginx access logs record the request path
+without its query string, and nginx's also omits client IP, referer and user
+agent. nginx's error log is the exception: on a request-level error, such as
+an unreachable backend, it still quotes the full request line.
+
 ## Inference provider setup
 
 Any OpenAI-compatible endpoint works. In the federation, translator reaches
