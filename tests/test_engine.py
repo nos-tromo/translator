@@ -9,8 +9,11 @@ from unittest.mock import MagicMock
 
 import pytest
 from openai import BadRequestError
+from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from openai.types.chat.chat_completion import Choice
+from openai.types.completion_usage import CompletionUsage
 
-from translator.engine import DETECTION_PREFIX_LIMIT, Translator
+from translator.engine import DETECTION_PREFIX_LIMIT, InferenceTrace, Translator
 
 
 @pytest.fixture
@@ -440,3 +443,116 @@ def test_get_language_info_logs_no_requested_code(translator: Translator, caplog
     assert translator.get_language_info(_SYNTHETIC_MARKER) == {"name": _SYNTHETIC_MARKER, "flag": ""}
     assert "LookupError" in caplog.text
     assert _SYNTHETIC_MARKER not in caplog.text
+
+
+# ── InferenceTrace: correlation id and reported usage ──────────────────────────
+
+
+def _reply(content: str | None, *, prompt_tokens: int, completion_tokens: int, usage: bool = True) -> ChatCompletion:
+    """Build a chat-completions reply as the OpenAI client returns it.
+
+    Args:
+        content: The message content, or ``None`` for a reply without text.
+        prompt_tokens: The prompt tokens the endpoint reports.
+        completion_tokens: The completion tokens the endpoint reports.
+        usage: Whether the reply reports usage at all.
+
+    Returns:
+        ChatCompletion: The reply, naming ``zz-served-model`` as the model that served.
+    """
+    message = ChatCompletionMessage(role="assistant", content=content)
+    reported = CompletionUsage(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=prompt_tokens + completion_tokens,
+    )
+    return ChatCompletion(
+        id="chatcmpl-zz-synthetic",
+        object="chat.completion",
+        created=0,
+        model="zz-served-model",
+        choices=[Choice(index=0, finish_reason="stop", message=message)],
+        usage=reported if usage else None,
+    )
+
+
+def test_trace_forwards_request_id_and_sums_usage(translator: Translator) -> None:
+    """Both calls of a request carry its correlation id, and their usage adds up.
+
+    Args:
+        translator: Translator instance provided by the ``translator`` fixture.
+    """
+    translator.client = MagicMock()
+    create = translator.client.chat.completions.create
+    create.side_effect = [
+        _reply("en", prompt_tokens=40, completion_tokens=1),
+        _reply("Bonjour", prompt_tokens=60, completion_tokens=20),
+    ]
+    trace = InferenceTrace(request_id="zz-request-0001")
+
+    translator.detect_language("Hello", trace=trace)
+    translator.translate("Hello", "English", "en", "French", "fr", trace=trace)
+
+    assert [call.kwargs["extra_headers"] for call in create.call_args_list] == [{"X-Request-ID": "zz-request-0001"}] * 2
+    assert (trace.calls, trace.input_tokens, trace.output_tokens) == (2, 100, 21)
+    assert trace.model_id == "zz-served-model"
+
+
+@pytest.mark.parametrize("trace", [None, InferenceTrace()], ids=["no-trace", "no-request-id"])
+def test_no_correlation_header_without_request_id(translator: Translator, trace: InferenceTrace | None) -> None:
+    """Without a correlation id, inference calls carry no extra header.
+
+    Args:
+        translator: Translator instance provided by the ``translator`` fixture.
+        trace: The trace passed to the engine, if any.
+    """
+    translator.client = MagicMock()
+    create = translator.client.chat.completions.create
+    create.return_value = _reply("en", prompt_tokens=1, completion_tokens=1)
+
+    translator.detect_language("Hello", trace=trace)
+    translator.translate("Hello", "English", "en", "French", "fr", trace=trace)
+
+    assert [call.kwargs["extra_headers"] for call in create.call_args_list] == [None, None]
+
+
+def test_trace_has_no_token_counts_when_a_call_reports_none(translator: Translator) -> None:
+    """Token counts are only given when every completed call reported its usage.
+
+    Args:
+        translator: Translator instance provided by the ``translator`` fixture.
+    """
+    translator.client = MagicMock()
+    translator.client.chat.completions.create.side_effect = [
+        _reply("en", prompt_tokens=40, completion_tokens=1),
+        _reply("Bonjour", prompt_tokens=0, completion_tokens=0, usage=False),
+    ]
+    trace = InferenceTrace(request_id="zz-request-0002")
+
+    translator.detect_language("Hello", trace=trace)
+    translator.translate("Hello", "English", "en", "French", "fr", trace=trace)
+
+    assert trace.calls == 2
+    assert (trace.input_tokens, trace.output_tokens) == (None, None)
+
+
+def test_trace_counts_a_completed_call_with_unusable_content(translator: Translator) -> None:
+    """A reply without text still counts as a completed call, with its usage.
+
+    Args:
+        translator: Translator instance provided by the ``translator`` fixture.
+    """
+    translator.client = MagicMock()
+    translator.client.chat.completions.create.return_value = _reply(None, prompt_tokens=60, completion_tokens=0)
+    trace = InferenceTrace()
+
+    with pytest.raises(RuntimeError, match="Translation failed"):
+        translator.translate("Hello", "English", "en", "French", "fr", trace=trace)
+
+    assert (trace.calls, trace.input_tokens, trace.output_tokens) == (1, 60, 0)
+
+
+def test_empty_trace_has_no_token_counts() -> None:
+    """A trace without completed calls reports no usage, rather than zero."""
+    trace = InferenceTrace(request_id="zz-request-0003")
+    assert (trace.calls, trace.input_tokens, trace.output_tokens, trace.model_id) == (0, None, None, None)

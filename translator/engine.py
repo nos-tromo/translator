@@ -3,16 +3,22 @@
 Wraps the OpenAI Python client to call an instruction-tuned model (e.g.
 Gemma-class) served by any OpenAI-compatible inference backend. Language
 detection is delegated to the same model; country flag emojis are resolved
-via ``langcodes`` and ``emoji-country-flag``.
+via ``langcodes`` and ``emoji-country-flag``. An :class:`InferenceTrace`
+carries a request's correlation id to the endpoint and brings back what the
+endpoint reports about the calls.
 """
 
 import logging
 import os
 import re
+from dataclasses import dataclass
 
 import flag
 from langcodes import Language
 from openai import APIStatusError, OpenAI
+from openai.types.chat import ChatCompletion
+
+from translator.utils.audit_runtime import REQUEST_ID_HEADER
 
 # Language detection only needs the beginning of the text; a bounded prefix
 # keeps the detection call cheap regardless of input size.
@@ -65,6 +71,67 @@ def _parse_iso_code(reply: str) -> str | None:
         return bare
     match = _PARENTHESISED_CODE_RE.search(reply.lower())
     return match.group(1) if match else None
+
+
+@dataclass
+class InferenceTrace:
+    """Bookkeeping for the model calls of one request.
+
+    Sends the request's correlation id to the inference endpoint as
+    ``X-Request-ID`` on every call, so the endpoint's records can be matched
+    with the request, and collects what the endpoint reports back: the model
+    that served and the token usage. It carries nothing else upstream —
+    never the caller's identity or stated purpose.
+
+    Attributes:
+        request_id: The correlation id to forward, or ``None`` to send none.
+        model_id: The model named in the last completed call's reply.
+        calls: How many calls completed.
+        prompt_tokens: Prompt tokens summed over the completed calls.
+        completion_tokens: Completion tokens summed over the completed calls.
+        usage_complete: Whether every completed call reported its usage.
+    """
+
+    request_id: str | None = None
+    model_id: str | None = None
+    calls: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    usage_complete: bool = True
+
+    def headers(self) -> dict[str, str] | None:
+        """Return the extra headers for an inference call.
+
+        Returns:
+            ``{"X-Request-ID": <id>}``, or ``None`` without a correlation id.
+        """
+        return {REQUEST_ID_HEADER: self.request_id} if self.request_id else None
+
+    def record(self, response: ChatCompletion) -> None:
+        """Take note of one completed call's reply.
+
+        Args:
+            response: The reply, whether or not its content is usable.
+        """
+        self.calls += 1
+        if isinstance(response.model, str) and response.model:
+            self.model_id = response.model
+        usage = response.usage
+        if usage is not None and isinstance(usage.prompt_tokens, int) and isinstance(usage.completion_tokens, int):
+            self.prompt_tokens += usage.prompt_tokens
+            self.completion_tokens += usage.completion_tokens
+        else:
+            self.usage_complete = False
+
+    @property
+    def input_tokens(self) -> int | None:
+        """Prompt tokens of all completed calls, or ``None`` unless each of them reported its usage."""
+        return self.prompt_tokens if self.calls and self.usage_complete else None
+
+    @property
+    def output_tokens(self) -> int | None:
+        """Completion tokens of all completed calls, or ``None`` unless each of them reported its usage."""
+        return self.completion_tokens if self.calls and self.usage_complete else None
 
 
 class Translator:
@@ -181,7 +248,7 @@ class Translator:
             self.logger.error(f"Error looking up language info: {_describe_error(e)}")
             return {"name": code, "flag": ""}
 
-    def detect_language(self, text: str) -> dict[str, str]:
+    def detect_language(self, text: str, *, trace: InferenceTrace | None = None) -> dict[str, str]:
         """Detect the language of a text string via the configured model.
 
         Sends a bounded prefix of the text (``DETECTION_PREFIX_LIMIT`` chars)
@@ -192,12 +259,15 @@ class Translator:
 
         Args:
             text: Text whose language should be detected.
+            trace: The request's trace: its correlation id is forwarded, and
+                the call's reply is recorded in it.
 
         Returns:
             A dict with keys ``"code"`` (ISO 639-1 language code), ``"name"``
             (human-readable language name) and ``"flag"`` (country flag emoji).
             Returns ``{"code": "", "name": "", "flag": ""}`` if detection fails.
         """
+        trace = trace if trace is not None else InferenceTrace()
         try:
             prompt = (
                 "Identify the language of the following text. Reply with only the "
@@ -209,7 +279,9 @@ class Translator:
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0,
                 max_tokens=10,
+                extra_headers=trace.headers(),
             )
+            trace.record(response)
             content = response.choices[0].message.content
             if not isinstance(content, str):
                 raise _FixedReasonError("Language detection response did not contain text content.")
@@ -230,6 +302,8 @@ class Translator:
         src_lang_code: str,
         trg_lang_name: str,
         trg_lang_code: str,
+        *,
+        trace: InferenceTrace | None = None,
     ) -> str:
         """Translate text using the configured model.
 
@@ -244,6 +318,8 @@ class Translator:
             src_lang_code: ISO 639-1 source language code (e.g. ``"fr"``).
             trg_lang_name: Human-readable target language name (e.g. ``"English"``).
             trg_lang_code: ISO 639-1 target language code (e.g. ``"en"``).
+            trace: The request's trace: its correlation id is forwarded, and
+                the call's reply is recorded in it.
 
         Returns:
             The translated text with leading/trailing whitespace stripped.
@@ -252,6 +328,7 @@ class Translator:
             RuntimeError: If ``text`` is empty, the API call fails, or the model
                 returns non-string content.
         """
+        trace = trace if trace is not None else InferenceTrace()
         try:
             if not text:
                 raise _FixedReasonError("Input text cannot be empty.")
@@ -279,7 +356,9 @@ class Translator:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
+                extra_headers=trace.headers(),
             )
+            trace.record(response)
 
             content = response.choices[0].message.content
             if not isinstance(content, str):
