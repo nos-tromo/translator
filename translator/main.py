@@ -4,7 +4,8 @@ Exposes endpoints under ``/api/v1``:
 
 * ``POST /translate`` — accepts text and a target language code, auto-detects
   (or accepts an explicit) source language, and returns the translation together
-  with detected language metadata.
+  with detected language metadata. Requires an authenticated caller
+  (:func:`~translator.identity.resolve_principal`; 401 without one).
 * ``GET /languages`` — returns the list of supported language codes and their
   human-readable names sourced from ``language_map.json``.
 * ``GET /version`` — returns the running app version.
@@ -26,13 +27,13 @@ from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import cast
 
-from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from loguru import logger
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field, field_validator
 
 from translator.engine import Translator
-from translator.identity import get_edge_secret, resolve_identity
+from translator.identity import get_default_identity, get_edge_secret, resolve_identity, resolve_principal
 from translator.log_cfg import setup_logger
 
 setup_logger()
@@ -81,6 +82,8 @@ router = APIRouter(prefix="/api/v1")
 translator = Translator()
 # Startup check: a too-short TRANSLATOR_EDGE_SECRET fails the import here; unset logs one warning.
 get_edge_secret()
+# Startup notice: a set TRANSLATOR_DEFAULT_IDENTITY (dev only) logs one warning.
+get_default_identity()
 
 # Aggregate-only request metrics (method, path template, status, latency) for
 # the obs-plane Prometheus scrape target. No request/response bodies — so no
@@ -200,6 +203,7 @@ def _load_language_codes(
     description="Translates input text to a target language via an OpenAI-compatible endpoint.",
     tags=["Translation"],
     response_model=TranslationResponse,
+    dependencies=[Depends(resolve_principal)],
 )
 def translate(req: TranslationRequest) -> TranslationResponse | None:
     """Translate text to the requested target language.

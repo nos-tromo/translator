@@ -19,8 +19,31 @@ import pytest
 from fastapi.testclient import TestClient
 from loguru import logger
 
-from translator.identity import EDGE_SECRET_ENV, get_edge_secret
+from translator.identity import DEFAULT_IDENTITY_ENV, EDGE_SECRET_ENV, get_default_identity, get_edge_secret
 from translator.main import app
+
+
+@pytest.fixture(autouse=True)
+def _no_identity_config_from_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Start every test without an edge secret or a default identity.
+
+    ``translator.log_cfg`` loads the repo's ``.env`` at import, so a
+    developer's own values would otherwise decide which callers count as
+    authenticated. Tests that need either set it with the fixtures below.
+
+    Args:
+        monkeypatch: Pytest fixture that restores the environment afterwards.
+
+    Yields:
+        None: Control to the test.
+    """
+    for name in (EDGE_SECRET_ENV, DEFAULT_IDENTITY_ENV):
+        monkeypatch.delenv(name, raising=False)
+    get_edge_secret.cache_clear()
+    get_default_identity.cache_clear()
+    yield
+    get_edge_secret.cache_clear()
+    get_default_identity.cache_clear()
 
 
 @pytest.fixture
@@ -38,7 +61,8 @@ def set_edge_secret(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[str |
     """Set or unset ``TRANSLATOR_EDGE_SECRET`` for one test.
 
     The backend reads the secret once per process, so the cached value is
-    dropped on every change and again after the test.
+    dropped on every change and again after the test — with the default
+    identity, which counts only while no secret is set.
 
     Args:
         monkeypatch: Pytest fixture that restores the environment afterwards.
@@ -53,9 +77,36 @@ def set_edge_secret(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[str |
         else:
             monkeypatch.setenv(EDGE_SECRET_ENV, value)
         get_edge_secret.cache_clear()
+        get_default_identity.cache_clear()
 
     yield _set
     get_edge_secret.cache_clear()
+    get_default_identity.cache_clear()
+
+
+@pytest.fixture
+def set_default_identity(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[str | None], None]]:
+    """Set or unset ``TRANSLATOR_DEFAULT_IDENTITY`` for one test.
+
+    Read once per process like the edge secret, so the cached value is
+    dropped on every change and again after the test.
+
+    Args:
+        monkeypatch: Pytest fixture that restores the environment afterwards.
+
+    Yields:
+        Callable[[str | None], None]: Sets the identity, or unsets it for ``None``.
+    """
+
+    def _set(value: str | None) -> None:
+        if value is None:
+            monkeypatch.delenv(DEFAULT_IDENTITY_ENV, raising=False)
+        else:
+            monkeypatch.setenv(DEFAULT_IDENTITY_ENV, value)
+        get_default_identity.cache_clear()
+
+    yield _set
+    get_default_identity.cache_clear()
 
 
 @pytest.fixture
