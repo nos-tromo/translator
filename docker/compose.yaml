@@ -58,6 +58,10 @@ services:
       # Uniform federation UI-language switch (en|de, default en). UI only —
       # the translation target stays a per-request choice.
       RESPONSE_LANGUAGE: ${RESPONSE_LANGUAGE:-en}
+      # Shared with the edge gateway, which sends it as X-Edge-Secret. Set:
+      # identity headers count only on requests carrying it. Unset: trusted
+      # from any caller (legacy).
+      TRANSLATOR_EDGE_SECRET: ${TRANSLATOR_EDGE_SECRET:-}
     env_file: *env-file
     networks:
       translator-net:

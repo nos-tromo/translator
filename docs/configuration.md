@@ -81,6 +81,37 @@ In production the SPA is served under the canonical `/translator/` sub-path
 behind the `edge-plane` gateway, not at its own vhost root. The frontend joins
 the external `edge-net` network as alias `translator-frontend`; the gateway is
 the sole production entry point and supplies `X-Auth-User` / `X-Auth-Name`.
-translator enforces nothing on them: `GET /api/v1/whoami` echoes both back so
-the SPA header can show who is signed in, and nothing else reads them. See
-`edge-plane` for the gateway side.
+`GET /api/v1/whoami` echoes both back so the SPA header can show who is signed
+in, and nothing else reads them. With the edge secret below set, it echoes
+them only on requests that carry that secret. See `edge-plane` for the
+gateway side.
+
+### Edge secret
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `TRANSLATOR_EDGE_SECRET` | No | — | Secret shared with the edge gateway, which sends it in `X-Edge-Secret`. When set, the identity headers count only on requests that carry it. At least 32 characters; surrounding whitespace is ignored |
+
+The backend is also on the shared `inference-net`, so any container there can
+reach it and send identity headers of its own. The edge secret tells the
+gateway's requests apart: the gateway adds `X-Edge-Secret` to every request it
+proxies to the frontend, whose nginx passes it on to the backend. With
+`TRANSLATOR_EDGE_SECRET` set:
+
+- A request whose `X-Edge-Secret` matches the secret (compared in constant
+  time) is edge-verified, and its identity headers are used.
+- On any other request the identity headers are ignored: `/whoami` answers as
+  if they were absent. The backend logs a warning naming the method and path,
+  never the secret or a header value.
+- A value shorter than 32 characters stops the backend at startup; the error
+  does not contain the value.
+
+Unset or blank keeps the previous behaviour — identity headers are trusted
+from any caller — and the backend logs one warning at startup.
+
+Generate the secret with `make secret` in edge-plane; the same value goes into
+edge-plane's `.env` (see its `docs/identity-contract.md`). Roll it out gateway
+first: once the gateway sends `X-Edge-Secret`, set `TRANSLATOR_EDGE_SECRET` in
+translator's `.env` and run `make up`, which recreates the backend with it. In
+the other order every request is unverified until the gateway catches up, so
+`/whoami` returns nulls and the SPA shows no signed-in user.
