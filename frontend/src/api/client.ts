@@ -1,3 +1,5 @@
+import { withPurpose } from '@infra/ui'
+
 /** API base derived from Vite's base path so the SPA works under its
  *  canonical sub-path (/translator/) and at root (dev) alike. */
 export function apiBase(base: string = import.meta.env.BASE_URL): string {
@@ -5,6 +7,10 @@ export function apiBase(base: string = import.meta.env.BASE_URL): string {
 }
 
 export const API_BASE = apiBase()
+
+/** The purpose store's scope, translator's compose project name. The
+ *  header's PurposeBar and every request below use the same string. */
+export const PURPOSE_SCOPE = 'translator'
 
 export class ApiError extends Error {
   readonly status: number
@@ -35,13 +41,25 @@ async function parse<T>(res: Response): Promise<T> {
   return body as T
 }
 
+type SendInit = Omit<RequestInit, 'headers'> & { headers?: Record<string, string> }
+
+/** The one place a request leaves the SPA. It carries the purpose stated in
+ *  the header's PurposeBar (X-Audit-Purpose); a 428 opens the bar's dialog
+ *  and sends the request once more with the purpose saved there, or hands
+ *  the 428 back when the user cancels. The body is a string, so it can be
+ *  sent twice. */
+function send(path: string, init: SendInit = {}): Promise<Response> {
+  return withPurpose(PURPOSE_SCOPE, (purpose) =>
+    fetch(`${API_BASE}${path}`, { ...init, headers: { ...init.headers, ...purpose } }),
+  )
+}
+
 export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { signal })
-  return parse<T>(res)
+  return parse<T>(await send(path, { signal }))
 }
 
 export async function apiPost<T>(path: string, json: unknown, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await send(path, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(json),
