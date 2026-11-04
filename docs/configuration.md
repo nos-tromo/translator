@@ -56,11 +56,11 @@ request line.
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `AUDIT_OUTPUT` | No | `stdout` (compose sets `container`) | Where the backend's audit events go: `stdout` for the process's stdout, `container` for the container's main stdout under a container-wide lock. Any other value stops startup |
-| `AUDIT_REQUIRE_PURPOSE` | No | — (empty) | Comma-separated audit actions that need a stated purpose (`X-Audit-Purpose`). Only `ai_call`, which every translation records, has an effect here; with it listed, a translation without a purpose is refused with 428. An unknown action name stops startup |
+| `AUDIT_REQUIRE_PURPOSE` | No | — (empty; compose default empty too) | Comma-separated audit actions that need a stated purpose (`X-Audit-Purpose`). Only `ai_call`, which every translation records, has an effect here: `AUDIT_REQUIRE_PURPOSE=ai_call` refuses a translation without a purpose with 428, and the SPA's purpose bar then asks for one. Empty turns it off. An unknown action name stops startup |
 
 Every translation writes one `ai_call` event; [audit.md](audit.md) covers
-what it records, the endpoint list, and why requiring a purpose stays
-optional for translator.
+what it records, the endpoint list, the SPA's purpose bar, and how to require
+a purpose for translations or turn that off again.
 
 ## Inference provider setup
 

@@ -611,6 +611,37 @@ def test_no_428_unless_ai_call_is_required(
     assert event["outcome"] == "ok"
 
 
+@pytest.mark.parametrize(
+    "required", [None, "ai_call", "query, disclose", "disclose, ai_call"], ids=["unset", "ai-call", "other", "mixed"]
+)
+def test_config_asks_for_a_purpose_exactly_when_a_translation_needs_one(
+    client: TestClient,
+    audit_stream: CapturedAuditStream,
+    engine: MagicMock,
+    edge_headers: dict[str, str],
+    set_required_actions: Callable[[str | None], None],
+    required: str | None,
+) -> None:
+    """The SPA's required flag, read from ``/config``, agrees with the 428 of a translation.
+
+    Args:
+        client: TestClient provided by the ``client`` fixture.
+        audit_stream: The captured audit stream.
+        engine: The mock engine.
+        edge_headers: The gateway's headers for a signed-in user.
+        set_required_actions: Fixture that sets or unsets ``AUDIT_REQUIRE_PURPOSE``.
+        required: The configured ``AUDIT_REQUIRE_PURPOSE``, or ``None``.
+    """
+    set_required_actions(required)
+    purpose_required = bool(client.get("/api/v1/config").json()["require_purpose"])
+
+    r = client.post("/api/v1/translate", headers=edge_headers, json=_BODY)
+
+    assert r.status_code == (428 if purpose_required else 200)
+    [event] = audit_stream.operation_events()
+    assert event["outcome"] == ("denied" if purpose_required else "ok")
+
+
 def test_unrecorded_refusal_fails_closed(
     client: TestClient,
     audit_stream: CapturedAuditStream,
@@ -730,9 +761,12 @@ def test_unaudited_endpoints_write_no_event(
     assert audit_stream.operation_events() == []
 
 
-@pytest.mark.parametrize("action", ["lifecycle", "translate"])
+@pytest.mark.parametrize("action", ["lifecycle", "translate", "query"])
 def test_audited_refuses_a_non_endpoint_action(action: str) -> None:
-    """An endpoint can only be audited under one of the library's operation actions.
+    """An endpoint can only be audited under an action in ``ENDPOINT_ACTIONS``.
+
+    ``/config`` derives the SPA's required flag from that set, so an endpoint
+    recording any other action must add it there first.
 
     Args:
         action: An action name no endpoint may record.

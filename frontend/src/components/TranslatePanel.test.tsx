@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
+import { clearAllPurposes } from '@infra/ui'
+import { AppPurposeBar } from './AppPurposeBar'
 import { TranslatePanel } from './TranslatePanel'
 import { LanguageContext } from '../i18n/LanguageContext'
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.restoreAllMocks()
+  clearAllPurposes()
+  sessionStorage.clear()
+})
 
 function renderPanel() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -126,6 +132,61 @@ describe('TranslatePanel', () => {
     ).toBeInTheDocument()
     expect(screen.queryByText(/boom/)).not.toBeInTheDocument()
   })
+
+  it.each([
+    {
+      lang: 'en',
+      textLabel: 'Text to translate',
+      translate: 'Translate',
+      cancel: 'Cancel',
+      message: 'This action needs a stated purpose. Please state one in the header and try again.',
+    },
+    {
+      lang: 'de',
+      textLabel: 'Zu übersetzender Text',
+      translate: 'Übersetzen',
+      cancel: 'Abbrechen',
+      message:
+        'Für diese Aktion muss ein Zweck angegeben werden – Bitte geben Sie ihn oben in der Kopfzeile an und versuchen Sie es erneut.',
+    },
+  ] as const)(
+    'a declined purpose prompt says what is missing, not the generic error ($lang)',
+    async ({ lang, textLabel, translate, cancel, message }) => {
+      const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.endsWith('/api/v1/languages')) {
+          return jsonResponse([
+            { code: 'en', name: 'English' },
+            { code: 'fr', name: 'French' },
+          ])
+        }
+        return new Response(JSON.stringify({ detail: 'This action requires a stated purpose.' }), {
+          status: 428,
+          headers: { 'content-type': 'application/json' },
+        })
+      })
+      vi.stubGlobal('fetch', fetchFn)
+      const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      render(
+        <QueryClientProvider client={qc}>
+          <LanguageContext value={lang}>
+            <AppPurposeBar required />
+            <TranslatePanel />
+          </LanguageContext>
+        </QueryClientProvider>,
+      )
+
+      await userEvent.type(await screen.findByLabelText(textLabel), 'Hello Alice Example')
+      await userEvent.click(screen.getByRole('button', { name: translate }))
+      const dialog = await screen.findByRole('dialog')
+      await userEvent.click(within(dialog).getByRole('button', { name: cancel }))
+
+      expect(await screen.findByText(message)).toBeInTheDocument()
+      expect(screen.queryByText(/428/)).not.toBeInTheDocument()
+      const translateCalls = fetchFn.mock.calls.filter(([u]) => String(u).endsWith('/translate'))
+      expect(translateCalls).toHaveLength(1)
+    },
+  )
 
   it('renders German chrome when language is de', async () => {
     const fetchFn = vi.fn(async (input: RequestInfo | URL) => {

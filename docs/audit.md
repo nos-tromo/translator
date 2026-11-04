@@ -42,7 +42,7 @@ event without the log holding the translation itself.
 | `POST /api/v1/translate` | `ai_call` / `translate` | hands the caller's text to the inference service |
 | `GET /api/v1/languages` | — | static list, no personal data |
 | `GET /api/v1/version` | — | the release number |
-| `GET /api/v1/config` | — | the SPA's bootstrap config |
+| `GET /api/v1/config` | — | the SPA's bootstrap config: UI language and the actions that need a purpose |
 | `GET /api/v1/whoami` | — | echoes the caller's own identity headers, for display |
 | `GET /api/v1/health` | — | liveness probe |
 | `GET /metrics` | — | aggregate request metrics, no request content |
@@ -74,20 +74,78 @@ recorded as `denied`.
 
 A request states its purpose in the `X-Audit-Purpose` header: the
 form-encoded serialization of up to two fields, `case_ref` and `reason`, for
-example `case_ref=case-0001&reason=Quality+review`. The purpose goes into the
-event and nowhere else: no ops log line carries it.
+example `case_ref=case-0001&reason=Quality+review`. The SPA sends it from its
+[purpose bar](#the-purpose-bar). The purpose goes into the event and nowhere
+else: no ops log line carries it (of the request headers, the frontend's
+nginx access log records only the request id), and the inference service
+never receives it.
 
 - A malformed, oversized or ambiguous value, or more than one
   `X-Audit-Purpose` header, gets 400 and nothing is recorded: there is no
   valid operation yet.
 - `AUDIT_REQUIRE_PURPOSE` lists the actions that need a stated purpose. Of
-  these, only `ai_call` occurs in translator. With `ai_call` listed, a
-  translation without a purpose is recorded as `denied` (with its criteria)
-  and answered with 428; it never reaches the model. The default is empty.
+  these, only `ai_call` occurs in translator, so **`ai_call` is the value that
+  requires a purpose for translations**. With it listed, a translation without
+  a purpose is recorded as `denied` (with its criteria) and answered with 428;
+  it never reaches the model. Any other action in the list refuses nothing
+  here: translator stores nothing, so it never queries or discloses stored
+  data, and a `query,disclose` list shared with the apps that do changes
+  nothing for it.
 
-For translator, requiring a purpose stays an available setting, not a
-recommended one. The SPA does not send `X-Audit-Purpose` yet, so with
-`ai_call` required every translation from the SPA is refused.
+### The default, and how to change it
+
+The default is empty, in the code and in `docker/compose.yaml`
+(`AUDIT_REQUIRE_PURPOSE: ${AUDIT_REQUIRE_PURPOSE:-}`): translations need no
+purpose, though the bar still lets the user state one and every request then
+carries it. Requiring one stays an operator's choice for translator.
+
+- To require a purpose for every translation, set
+  `AUDIT_REQUIRE_PURPOSE=ai_call` in `.env` and run `make up`, which recreates
+  the backend with it. From then on a translation without a purpose is
+  refused with 428, and the SPA's bar asks for one.
+- To turn it off again, set it empty (`AUDIT_REQUIRE_PURPOSE=`) or remove the
+  line, and run `make up`.
+
+The backend reads the value once at startup; an unknown action name stops it.
+
+## The purpose bar
+
+The SPA's header carries `@infra/ui`'s `PurposeBar`, where the user states a
+case reference, a reason, or both, once. The SPA's fetch wrapper
+(`frontend/src/api/client.ts`) sends it as `X-Audit-Purpose` with every API
+request, under the scope `translator`; while none is stated, no header is
+sent.
+
+- The bar is always mounted, so a purpose can be stated whether or not one is
+  required. `GET /api/v1/config` reports `require_purpose`: the actions listed
+  in `AUDIT_REQUIRE_PURPOSE` that translator's endpoints record, sorted —
+  today `["ai_call"]` or `[]`. While it is non-empty, the empty bar is a
+  warning ("Purpose required") and a blank purpose cannot be saved.
+- A request answered with 428 opens the bar's dialog; when the user saves a
+  purpose, the request is sent once more with it. The SPA's 120-second limit
+  for a translation applies to each attempt, so the time spent in the dialog
+  does not shorten the resend. Cancelling leaves the 428,
+  and the SPA says so in its own words instead of its generic error: the
+  action needs a stated purpose, to be stated in the header.
+- The purpose stays in the browser tab's `sessionStorage` — across reloads,
+  never into another tab — kept apart from the other apps' behind the same
+  gateway, until the user changes or clears it, closes the tab, or signs out
+  through the header's account menu, which clears every app's purpose.
+- The bar's labels follow `RESPONSE_LANGUAGE` (English or German).
+
+### Requests the SPA makes
+
+Every request the SPA sends to the API is a `fetch` through that wrapper. It
+makes none that a header cannot ride on: no download link, media element,
+`EventSource`, `window.open` or form post against the API.
+
+| Request | Audited as | How it carries the purpose |
+|---|---|---|
+| `POST /api/v1/translate` | `ai_call` / `translate` | `X-Audit-Purpose` from the fetch wrapper; a 428 asks through the bar and sends once more |
+| `GET /api/v1/config`, `/languages`, `/version`, `/whoami` | — | the same wrapper sends it; these endpoints do not use it |
+| `.txt` upload | — | read in the browser; nothing is sent until the user translates |
+| Copy translation | — | the clipboard; no request |
+| The page and its static assets (`/translator/`, `/translator/assets/…`) | — | served by nginx; no API request |
 
 ## Correlation
 
@@ -118,7 +176,8 @@ compose project name the audit store binds the chain to, and the release as
 - `lifecycle` / `start` opens it;
 - `admin` / `config.audit` (actor `via: system`) records the operating
   mode: `edge_secret_enforced`, `default_identity_enabled` and
-  `require_purpose` (the required actions). Never a secret or an account;
+  `require_purpose` (every action `AUDIT_REQUIRE_PURPOSE` lists, including
+  any translator does not record). Never a secret or an account;
 - `lifecycle` / `heartbeat` follows every 60 seconds;
 - `lifecycle` / `shutdown` closes it on a clean stop.
 
@@ -143,7 +202,7 @@ The lock file is `/tmp/audit-stream.lock` on the backend's `/tmp` tmpfs.
 | Variable | Default | Purpose |
 |---|---|---|
 | `AUDIT_OUTPUT` | `stdout` (compose sets `container`) | Where the chain goes: `stdout` for the process's stdout, `container` for the container's main stdout under the container-wide lock. Any other value stops startup |
-| `AUDIT_REQUIRE_PURPOSE` | empty | Comma-separated actions that need a stated purpose; only `ai_call` occurs in translator. Any audit action except `lifecycle` is accepted, so a list shared with other services works; any other name stops startup |
+| `AUDIT_REQUIRE_PURPOSE` | empty (compose too) | Comma-separated actions that need a stated purpose; only `ai_call` occurs in translator, so `ai_call` makes every translation without a purpose a 428, and empty turns that off ([above](#the-default-and-how-to-change-it)). Any audit action except `lifecycle` is accepted, so a list shared with other services works; any other name stops startup |
 | `TRANSLATOR_DEFAULT_IDENTITY` | — (dev overlay: `dev`) | Dev-only fallback account for requests without a trusted identity; ignored while `TRANSLATOR_EDGE_SECRET` is set. Leave it unset in production |
 
 `AUDIT_CASE_REF`, `AUDIT_REASON` and `AUDIT_CLI_USER` state the purpose and

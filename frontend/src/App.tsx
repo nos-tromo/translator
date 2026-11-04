@@ -1,12 +1,17 @@
 import { QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { AppShell, PageHeader } from '@infra/ui'
+import { purposeRequired } from './api/config'
 import { getVersion, getWhoami } from './api/translator'
 import { queryClient } from './api/queryClient'
+import { AppPurposeBar } from './components/AppPurposeBar'
 import { TranslatePanel } from './components/TranslatePanel'
+import { useAppConfig } from './hooks/useAppConfig'
 import { LanguageProvider, useT } from './i18n/LanguageContext'
 
 function AppContent() {
   const t = useT()
+  // Already loaded: LanguageProvider waits for the same query.
+  const { data: config } = useAppConfig()
   const { data } = useQuery({
     queryKey: ['version'],
     queryFn: getVersion,
@@ -34,6 +39,7 @@ function AppContent() {
         dark: t('appheader.theme_dark'),
       }}
       signOutLabel={t('appheader.sign_out')}
+      headerActions={<AppPurposeBar required={purposeRequired(config)} />}
     >
       <div className="flex min-h-full flex-col p-8">
         <PageHeader title={t('page.title')} caption={t('page.caption')} />

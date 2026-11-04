@@ -313,16 +313,48 @@ def test_get_config_defaults_to_english(client: TestClient, monkeypatch: MonkeyP
     monkeypatch.delenv("RESPONSE_LANGUAGE", raising=False)
     response = client.get("/api/v1/config")
     assert response.status_code == 200
-    assert response.json() == {"language": "en"}
+    assert response.json() == {"language": "en", "require_purpose": []}
 
 
 def test_get_config_german(client: TestClient, monkeypatch: MonkeyPatch) -> None:
     """RESPONSE_LANGUAGE=de serves the German UI."""
     monkeypatch.setenv("RESPONSE_LANGUAGE", "de")
-    assert client.get("/api/v1/config").json() == {"language": "de"}
+    assert client.get("/api/v1/config").json() == {"language": "de", "require_purpose": []}
 
 
 def test_get_config_unknown_value_falls_back(client: TestClient, monkeypatch: MonkeyPatch) -> None:
     """A typo can never break bring-up — unknown values fall back to en."""
     monkeypatch.setenv("RESPONSE_LANGUAGE", "klingon")
-    assert client.get("/api/v1/config").json() == {"language": "en"}
+    assert client.get("/api/v1/config").json() == {"language": "en", "require_purpose": []}
+
+
+@pytest.mark.parametrize(
+    ("required", "expected"),
+    [
+        (None, []),
+        ("", []),
+        ("ai_call", ["ai_call"]),
+        ("query, disclose", []),
+        ("disclose, AI_CALL, query", ["ai_call"]),
+    ],
+    ids=["unset", "empty", "ai-call", "other-actions", "mixed"],
+)
+def test_get_config_reports_the_actions_that_need_a_purpose(
+    client: TestClient,
+    set_required_actions: Callable[[str | None], None],
+    required: str | None,
+    expected: list[str],
+) -> None:
+    """``require_purpose`` lists the required actions translator's endpoints record, and no other.
+
+    An action that only the federation's other apps record refuses nothing
+    here, so it must not make the SPA's purpose bar insist on a purpose.
+
+    Args:
+        client: TestClient provided by the ``client`` fixture.
+        set_required_actions: Fixture that sets or unsets ``AUDIT_REQUIRE_PURPOSE``.
+        required: The configured ``AUDIT_REQUIRE_PURPOSE``, or ``None``.
+        expected: The ``require_purpose`` the SPA must be told.
+    """
+    set_required_actions(required)
+    assert client.get("/api/v1/config").json()["require_purpose"] == expected

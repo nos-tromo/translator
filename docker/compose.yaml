@@ -66,7 +66,9 @@ services:
       # to the container's main stdout under a container-wide lock (on the
       # /tmp tmpfs); ops logs go to stderr.
       AUDIT_OUTPUT: container
-      # Actions that need a stated purpose (X-Audit-Purpose); empty = none.
+      # Actions that need a stated purpose (X-Audit-Purpose, from the SPA's
+      # purpose bar). translator stores nothing, so none by default; set
+      # `ai_call` to require one for every translation (docs/audit.md).
       AUDIT_REQUIRE_PURPOSE: ${AUDIT_REQUIRE_PURPOSE:-}
     env_file: *env-file
     networks:

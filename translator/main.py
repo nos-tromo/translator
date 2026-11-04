@@ -11,7 +11,8 @@ Exposes endpoints under ``/api/v1``:
 * ``GET /languages`` — returns the list of supported language codes and their
   human-readable names sourced from ``language_map.json``.
 * ``GET /version`` — returns the running app version.
-* ``GET /config`` — returns the SPA bootstrap config (UI language).
+* ``GET /config`` — returns the SPA bootstrap config: the UI language and
+  the audit actions that need a stated purpose.
 * ``GET /whoami`` — echoes the gateway's identity headers
   (``X-Auth-User``/``X-Auth-Name``) as far as they are trusted (see
   :mod:`translator.identity`), for display only.
@@ -37,7 +38,14 @@ from loguru import logger
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field, field_validator
 
-from translator.audit import AuditedCall, audited, get_required_actions, open_emitter, start_chain
+from translator.audit import (
+    AuditedCall,
+    audited,
+    get_required_actions,
+    open_emitter,
+    required_endpoint_actions,
+    start_chain,
+)
 from translator.engine import InferenceTrace, Translator
 from translator.identity import get_default_identity, get_edge_secret, resolve_identity
 from translator.log_cfg import setup_logger
@@ -187,9 +195,18 @@ class TranslationResponse(BaseModel):
 
 
 class ConfigResponse(BaseModel):
-    """Client bootstrap config for the SPA."""
+    """Client bootstrap config for the SPA.
+
+    Attributes:
+        language: The UI language, ``en`` or ``de``.
+        require_purpose: The audit actions of translator's endpoints that need
+            a stated purpose, sorted: ``["ai_call"]`` while a translation
+            without one is refused, else empty. The SPA's purpose bar shows a
+            purpose as required while it is non-empty.
+    """
 
     language: str
+    require_purpose: list[str]
 
 
 class WhoamiResponse(BaseModel):
@@ -389,17 +406,24 @@ def get_version() -> dict[str, str]:
 
 @router.get("/config", summary="SPA bootstrap config", tags=["Metadata"])
 def get_config() -> ConfigResponse:
-    """Return the SPA bootstrap config (UI language). Unauthenticated, like /health."""
-    return ConfigResponse(language=load_ui_language())
+    """Return the SPA bootstrap config: the UI language and the actions that need a stated purpose.
+
+    Unauthenticated and not audited, like ``/health``: it describes the
+    deployment, never a caller or their data.
+
+    Returns:
+        A :class:`ConfigResponse`.
+    """
+    return ConfigResponse(language=load_ui_language(), require_purpose=required_endpoint_actions())
 
 
 @router.get("/whoami", summary="Signed-in identity", tags=["Metadata"])
 def get_whoami(request: Request) -> WhoamiResponse:
     """Echo the gateway's identity headers, for the SPA's AppHeader.
 
-    translator has no principal seam (unlike chorus/docint/Nextext): this is
-    purely decorative header-echo for display, not an authorization gate, so
-    it stays unauthenticated like ``/version`` and ``/config`` — both fields
+    Display only, never an authorization gate (that is
+    :func:`~translator.identity.resolve_principal` on ``/translate``), so it
+    stays unauthenticated like ``/version`` and ``/config`` — both fields
     are ``None`` outside the gateway (dev) rather than a 401. The headers are
     read through :func:`~translator.identity.resolve_identity`, so with
     ``TRANSLATOR_EDGE_SECRET`` set, a request without the matching
