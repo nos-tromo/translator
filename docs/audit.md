@@ -122,7 +122,9 @@ sent.
   today `["ai_call"]` or `[]`. While it is non-empty, the empty bar is a
   warning ("Purpose required") and a blank purpose cannot be saved.
 - A request answered with 428 opens the bar's dialog; when the user saves a
-  purpose, the request is sent once more with it. Cancelling leaves the 428,
+  purpose, the request is sent once more with it. The SPA's 120-second limit
+  for a translation applies to each attempt, so the time spent in the dialog
+  does not shorten the resend. Cancelling leaves the 428,
   and the SPA says so in its own words instead of its generic error: the
   action needs a stated purpose, to be stated in the header.
 - The purpose stays in the browser tab's `sessionStorage` — across reloads,
