@@ -98,7 +98,8 @@ translator/                       # the importable package
   main.py        FastAPI app. Instantiates a single Translator at startup;
                  the lifespan runs the process's audit chain.
                  Endpoints under /api/v1: POST /translate, GET /languages,
-                 GET /version, GET /config, GET /whoami, GET /health.
+                 GET /version, GET /config (UI language + require_purpose),
+                 GET /whoami, GET /health.
   engine.py      Translator class. Wraps an OpenAI-compatible client to call
                  the configured model for both translation and source-language
                  detection (a small second completions call on a bounded text
@@ -114,8 +115,10 @@ translator/                       # the importable package
                  while no edge secret is set, else 401).
   audit.py       Data-protection audit glue: the per-process emitter, actor
                  mapping, X-Audit-Purpose, AUDIT_REQUIRE_PURPOSE (428), the
-                 audited() dependency. Reads AUDIT_OUTPUT and
-                 AUDIT_REQUIRE_PURPOSE itself, like identity.py its variables.
+                 audited() dependency, ENDPOINT_ACTIONS (the actions the
+                 endpoints record) and the require_purpose list GET /config
+                 reports. Reads AUDIT_OUTPUT and AUDIT_REQUIRE_PURPOSE
+                 itself, like identity.py its variables.
   utils/         audit_event.py + audit_runtime.py: byte-identical copies of
                  the canonical files in nos-tromo/.github configs/audit/.
                  Never edit them here.
@@ -173,7 +176,7 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
 | `TRANSLATOR_EDGE_SECRET` | No | — | Secret shared with the edge gateway, sent as `X-Edge-Secret`. Set (≥ 32 characters, else startup fails): identity headers count only on requests carrying it. Unset: trusted from any caller, one startup warning. See `docs/configuration.md` |
 | `TRANSLATOR_DEFAULT_IDENTITY` | No | — (dev overlay: `dev`) | Dev-only account for requests without a trusted `X-Auth-User` (else `/translate` answers 401); ignored while `TRANSLATOR_EDGE_SECRET` is set. Unset in production |
 | `AUDIT_OUTPUT` | No | `stdout` (compose: `container`) | Where the audit events go: the process's stdout, or the container's main stdout under a container-wide lock. Unknown value stops startup |
-| `AUDIT_REQUIRE_PURPOSE` | No | — | Audit actions that need a stated purpose (`X-Audit-Purpose`); only `ai_call` has an effect here (428 without one). Unknown action stops startup. See `docs/audit.md` |
+| `AUDIT_REQUIRE_PURPOSE` | No | — (compose: empty too) | Audit actions that need a stated purpose (`X-Audit-Purpose`); only `ai_call` has an effect here (428 without one, and the SPA's purpose bar shows it as required). Unknown action stops startup. See `docs/audit.md` |
 | `TRANSLATOR_FRONTEND_HOST_PORT` | No | `8501` | Dev-only host port; mapped to the frontend container's nginx on :8080 |
 | `TRANSLATOR_BACKEND_HOST_PORT` | No | `8000` | Dev-only host port for the FastAPI backend |
 | `INFERENCE_NETWORK` | No | `inference-net` | External Docker network the backend joins |
@@ -265,6 +268,22 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
   including uvicorn's access log, go to stderr. The vendored
   `translator/utils/audit_*.py` files are never edited here. Endpoint list,
   fields and knobs: `docs/audit.md`.
+- **The purpose comes from the header's purpose bar, through one wrapper.**
+  `@infra/ui`'s `PurposeBar` sits in `AppShell`'s `headerActions`
+  (`frontend/src/components/AppPurposeBar.tsx`, labels from the i18n
+  catalogs), and every API request leaves through `send()` in
+  `frontend/src/api/client.ts`, which hands it to `withPurpose` under the
+  scope `translator`: the stated purpose rides along as `X-Audit-Purpose`,
+  and a 428 opens the bar and resends once. Its `required` flag is
+  `GET /api/v1/config`'s `require_purpose`: the actions of
+  `audit.py::ENDPOINT_ACTIONS` that `AUDIT_REQUIRE_PURPOSE` lists — an
+  action no endpoint records refuses nothing, so it never makes the bar
+  insist. The compose default stays
+  empty (translator stores nothing); an operator sets `ai_call` to require a
+  purpose. Keep it one place: a new audited endpoint adds its action to
+  `ENDPOINT_ACTIONS` (`audited()` refuses any other), and a request the
+  browser would make without `fetch` (a download link, a media element) must
+  become a `fetch` through the wrapper, or it cannot carry the purpose.
 
 ## Git & PR Workflow
 

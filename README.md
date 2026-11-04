@@ -90,7 +90,8 @@ make verify  # the pre-push gate: pre-commit (ruff + pyrefly), pnpm lint, pnpm b
 - [Configuration](docs/configuration.md) — every environment variable, the
   inference-provider setup, and the production `/translator/` sub-path.
 - [Audit log](docs/audit.md) — what each translation records in the
-  data-protection audit log, per endpoint, and the settings around it.
+  data-protection audit log, per endpoint, the purpose bar that states why,
+  and the settings around it.
 - `CLAUDE.md` — architecture detail and the design decisions behind the
   engine, kept for contributors and coding agents.
 - Design history lives in `docs/` alongside, in dated design and plan files.
