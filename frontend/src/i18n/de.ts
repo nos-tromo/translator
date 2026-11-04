@@ -8,6 +8,24 @@ export const de: Strings = {
   'appheader.theme_dark': 'Dunkel',
   'appheader.sign_out': 'Abmelden',
 
+  // purpose (PurposeBar; {max} is filled in by the bar)
+  'purpose.label': 'Zweck',
+  'purpose.empty': 'Kein Zweck angegeben',
+  'purpose.required': 'Zweck erforderlich',
+  'purpose.title': 'Zweck',
+  'purpose.description':
+    'Wird mit jeder Ihrer Anfragen in dieser App gesendet, bis Sie ihn ändern oder entfernen oder die Sitzung endet.',
+  'purpose.requested': 'Diese Aktion erfordert die Angabe eines Zwecks.',
+  'purpose.case_ref': 'Aktenzeichen',
+  'purpose.reason': 'Begründung',
+  'purpose.save': 'Speichern',
+  'purpose.cancel': 'Abbrechen',
+  'purpose.clear': 'Entfernen',
+  'purpose.error_length': 'Höchstens {max} Zeichen.',
+  'purpose.error_control': 'Bitte entfernen Sie Zeilenumbrüche, Tabulatoren und andere Steuerzeichen.',
+  'purpose.error_header': 'Zusammen zu lang zum Senden. Bitte kürzen Sie eines der Felder.',
+  'purpose.error_empty': 'Bitte geben Sie ein Aktenzeichen oder eine Begründung ein.',
+
   // page
   'page.title': 'Übersetzen',
   'page.caption': 'Textübersetzung',
