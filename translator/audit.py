@@ -18,7 +18,10 @@ ids). Like :mod:`translator.identity`, it reads its own environment variables:
   process's stdout, ``container`` for the container's main stdout under a
   container-wide lock (what ``docker/compose.yaml`` sets).
 * ``AUDIT_REQUIRE_PURPOSE`` — comma-separated actions that need a stated
-  purpose; of these, only ``ai_call`` occurs in translator. Default empty.
+  purpose; of these, only ``ai_call`` occurs in translator
+  (:data:`ENDPOINT_ACTIONS`). Default empty. ``GET /api/v1/config`` reports
+  the ones in effect (:func:`required_endpoint_actions`), so the SPA's purpose
+  bar shows a purpose as required exactly when a translation needs one.
 
 One emitter, and so one hash chain, per process: created in the FastAPI
 lifespan, never at import. Audit writes fail closed: the caller turns a failed
@@ -58,6 +61,10 @@ SYSTEM_ACTOR: Final = Actor(user=None, via="system")
 
 _REQUIRABLE_ACTIONS: Final = ACTIONS - {"lifecycle"}
 
+#: The audit actions translator's endpoints record. :func:`audited` accepts no
+#: other, so this stays the complete set :func:`required_endpoint_actions` reads.
+ENDPOINT_ACTIONS: Final = frozenset({"ai_call"})
+
 
 @cache
 def get_required_actions() -> frozenset[str]:
@@ -75,6 +82,20 @@ def get_required_actions() -> frozenset[str]:
         ValueError: If an entry is not an audit action.
     """
     return parse_required_actions(os.getenv(REQUIRE_PURPOSE_ENV), known=_REQUIRABLE_ACTIONS)
+
+
+def required_endpoint_actions() -> list[str]:
+    """Return the actions of translator's endpoints that need a stated purpose.
+
+    What ``GET /api/v1/config`` reports as ``require_purpose``: the SPA's
+    purpose bar shows a purpose as required while this is non-empty. An
+    action in ``AUDIT_REQUIRE_PURPOSE`` that no endpoint records, as in a
+    list shared with other services, refuses nothing here and is left out.
+
+    Returns:
+        The actions, sorted; empty when no request needs a stated purpose.
+    """
+    return sorted(get_required_actions() & ENDPOINT_ACTIONS)
 
 
 def operating_mode() -> dict[str, object]:
@@ -292,10 +313,11 @@ def audited(action: str, operation: str) -> Callable[[Request], AuditedCall]:
         The dependency, which returns the request's :class:`AuditedCall`.
 
     Raises:
-        ValueError: If ``action`` is not an audit action an endpoint may record.
+        ValueError: If ``action`` is not in :data:`ENDPOINT_ACTIONS`; an
+            endpoint with a new action adds it there first.
     """
-    if action not in _REQUIRABLE_ACTIONS:
-        raise ValueError(f"not an endpoint audit action: {action!r}")
+    if action not in ENDPOINT_ACTIONS:
+        raise ValueError(f"not an endpoint audit action: {action!r} (add it to ENDPOINT_ACTIONS)")
 
     def dependency(request: Request) -> AuditedCall:
         """Resolve the audit context of one request.
