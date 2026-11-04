@@ -15,6 +15,7 @@ reaches inference over the shared `inference-net` network.
 |---|---|---|
 | Backend | `translator/main.py` | FastAPI app — six routes under `/api/v1`: `POST /translate`, `GET /languages`, `/version`, `/config`, `/whoami`, `/health` |
 | Engine | `translator/engine.py` | `Translator` class — language detection, flag lookup, LLM call |
+| Audit | `translator/audit.py` | Data-protection audit log: one event per translation, never its content ([docs/audit.md](docs/audit.md)) |
 | Frontend | `frontend/` | React SPA (Vite + `@infra/ui`), served by nginx; speaks HTTP to the backend |
 | Language map | `translator/language_map.json` | ~50 language codes to human-readable names |
 
@@ -34,6 +35,12 @@ cp .env.example .env    # set OPENAI_API_BASE and TEXT_MODEL
 make dev                # build, then start backend + SPA detached with host ports
 ```
 
+Translating needs a signed-in user, which the edge gateway supplies in
+production; since 1.7.0, `/translate` answers 401 to anonymous requests.
+Without the gateway, the dev overlay (`make dev`, `make up-dev`) translates as
+the account `dev` (`TRANSLATOR_DEFAULT_IDENTITY`); a local run without Docker
+sets it on the command line, as below.
+
 App: `http://localhost:${TRANSLATOR_FRONTEND_HOST_PORT:-8501}`
 
 `make dev` layers the dev overlay so host ports are published. `make up` runs
@@ -48,7 +55,8 @@ which the frontend joins. `make network` creates both.
 uv sync --group dev
 
 # Backend (FastAPI)
-OPENAI_API_BASE=http://localhost:11434/v1 TEXT_MODEL=<model> uv run uvicorn translator.main:app --reload
+OPENAI_API_BASE=http://localhost:11434/v1 TEXT_MODEL=<model> TRANSLATOR_DEFAULT_IDENTITY=dev-user \
+  uv run uvicorn translator.main:app --reload
 # API docs at http://127.0.0.1:8000/docs
 
 # Frontend (React SPA) — in a second terminal
@@ -65,6 +73,7 @@ Two variables are required; the rest have working defaults.
 | `OPENAI_API_BASE` | Yes | Base URL of the OpenAI-compatible endpoint — must include `/v1` |
 | `TEXT_MODEL` | Yes | Model identifier for translation and language detection |
 | `RESPONSE_LANGUAGE` | No | SPA interface language, `en` (default) or `de` |
+| `TRANSLATOR_DEFAULT_IDENTITY` | Dev only | Account to translate as without the edge gateway; the dev overlay sets `dev`. Leave unset in production |
 
 The full table lives in [docs/configuration.md](docs/configuration.md).
 
@@ -80,6 +89,8 @@ make verify  # the pre-push gate: pre-commit (ruff + pyrefly), pnpm lint, pnpm b
 
 - [Configuration](docs/configuration.md) — every environment variable, the
   inference-provider setup, and the production `/translator/` sub-path.
+- [Audit log](docs/audit.md) — what each translation records in the
+  data-protection audit log, per endpoint, and the settings around it.
 - `CLAUDE.md` — architecture detail and the design decisions behind the
   engine, kept for contributors and coding agents.
 - Design history lives in `docs/` alongside, in dated design and plan files.

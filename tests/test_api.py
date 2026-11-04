@@ -7,12 +7,18 @@ bundled ``language_map.json`` file directly and needs no mocking under normal
 conditions.
 """
 
-from unittest.mock import patch
+from collections.abc import Callable
+from unittest.mock import ANY, patch
 
+import pytest
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
 
 from translator.main import MAX_TEXT_LENGTH
+
+# A synthetic gateway-asserted account; no edge secret is configured in these tests.
+_USER = {"X-Auth-User": "alice"}
+_SECRET = "zz-synthetic-edge-secret-0123456789abcdef"
 
 # ── GET /languages ─────────────────────────────────────────────────────────────
 
@@ -73,7 +79,7 @@ def test_translate_auto_detect(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    with patch("translator.main.translator") as mock_t:
+    with patch("translator.main.translator", model="test-model") as mock_t:
         mock_t.detect_language.return_value = {
             "code": "en",
             "name": "English",
@@ -81,7 +87,7 @@ def test_translate_auto_detect(client: TestClient) -> None:
         }
         mock_t.translate.return_value = "Bonjour le monde"
 
-        r = client.post("/api/v1/translate", json={"text": "Hello world", "target_lang": "fr"})
+        r = client.post("/api/v1/translate", headers=_USER, json={"text": "Hello world", "target_lang": "fr"})
 
     assert r.status_code == 200
     data = r.json()
@@ -96,12 +102,13 @@ def test_translate_explicit_source_lang(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    with patch("translator.main.translator") as mock_t:
+    with patch("translator.main.translator", model="test-model") as mock_t:
         mock_t.get_language_info.return_value = {"name": "English", "flag": "🇬🇧"}
         mock_t.translate.return_value = "Hola mundo"
 
         r = client.post(
             "/api/v1/translate",
+            headers=_USER,
             json={"text": "Hello world", "target_lang": "es", "source_lang": "en"},
         )
 
@@ -117,7 +124,7 @@ def test_translate_calls_engine_with_correct_args(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    with patch("translator.main.translator") as mock_t:
+    with patch("translator.main.translator", model="test-model") as mock_t:
         mock_t.detect_language.return_value = {
             "code": "en",
             "name": "English",
@@ -125,9 +132,9 @@ def test_translate_calls_engine_with_correct_args(client: TestClient) -> None:
         }
         mock_t.translate.return_value = "Bonjour"
 
-        client.post("/api/v1/translate", json={"text": "Hello", "target_lang": "fr"})
+        client.post("/api/v1/translate", headers=_USER, json={"text": "Hello", "target_lang": "fr"})
 
-    mock_t.translate.assert_called_once_with("Hello", "English", "en", "French", "fr")
+    mock_t.translate.assert_called_once_with("Hello", "English", "en", "French", "fr", trace=ANY)
 
 
 def test_translate_returns_500_on_engine_error(client: TestClient) -> None:
@@ -136,7 +143,7 @@ def test_translate_returns_500_on_engine_error(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    with patch("translator.main.translator") as mock_t:
+    with patch("translator.main.translator", model="test-model") as mock_t:
         mock_t.detect_language.return_value = {
             "code": "en",
             "name": "English",
@@ -144,7 +151,7 @@ def test_translate_returns_500_on_engine_error(client: TestClient) -> None:
         }
         mock_t.translate.side_effect = RuntimeError("Translation failed")
 
-        r = client.post("/api/v1/translate", json={"text": "Hello", "target_lang": "fr"})
+        r = client.post("/api/v1/translate", headers=_USER, json={"text": "Hello", "target_lang": "fr"})
 
     assert r.status_code == 500
 
@@ -155,7 +162,7 @@ def test_translate_missing_text_returns_422(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    r = client.post("/api/v1/translate", json={"target_lang": "fr"})
+    r = client.post("/api/v1/translate", headers=_USER, json={"target_lang": "fr"})
     assert r.status_code == 422
 
 
@@ -165,7 +172,7 @@ def test_translate_missing_target_lang_returns_422(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    r = client.post("/api/v1/translate", json={"text": "Hello"})
+    r = client.post("/api/v1/translate", headers=_USER, json={"text": "Hello"})
     assert r.status_code == 422
 
 
@@ -175,7 +182,7 @@ def test_translate_unknown_target_lang_falls_back_to_code(client: TestClient) ->
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    with patch("translator.main.translator") as mock_t:
+    with patch("translator.main.translator", model="test-model") as mock_t:
         mock_t.detect_language.return_value = {
             "code": "en",
             "name": "English",
@@ -183,7 +190,7 @@ def test_translate_unknown_target_lang_falls_back_to_code(client: TestClient) ->
         }
         mock_t.translate.return_value = "some translation"
 
-        r = client.post("/api/v1/translate", json={"text": "Hello", "target_lang": "xx"})
+        r = client.post("/api/v1/translate", headers=_USER, json={"text": "Hello", "target_lang": "xx"})
 
     assert r.status_code == 200
     # target lang name falls back to the raw code "xx"
@@ -197,7 +204,7 @@ def test_translate_empty_text_returns_422(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    r = client.post("/api/v1/translate", json={"text": "", "target_lang": "fr"})
+    r = client.post("/api/v1/translate", headers=_USER, json={"text": "", "target_lang": "fr"})
     assert r.status_code == 422
 
 
@@ -207,7 +214,7 @@ def test_translate_whitespace_only_text_returns_422(client: TestClient) -> None:
     Args:
         client: TestClient provided by the ``client`` fixture.
     """
-    r = client.post("/api/v1/translate", json={"text": "   \t\n", "target_lang": "fr"})
+    r = client.post("/api/v1/translate", headers=_USER, json={"text": "   \t\n", "target_lang": "fr"})
     assert r.status_code == 422
 
 
@@ -218,8 +225,57 @@ def test_translate_oversize_text_returns_422(client: TestClient) -> None:
         client: TestClient provided by the ``client`` fixture.
     """
     oversized = "a" * (MAX_TEXT_LENGTH + 1)
-    r = client.post("/api/v1/translate", json={"text": oversized, "target_lang": "fr"})
+    r = client.post("/api/v1/translate", headers=_USER, json={"text": oversized, "target_lang": "fr"})
     assert r.status_code == 422
+
+
+def test_translate_without_identity_returns_401(client: TestClient) -> None:
+    """Without a trusted or default identity, ``POST /translate`` refuses before any model call.
+
+    Args:
+        client: TestClient provided by the ``client`` fixture.
+    """
+    with patch("translator.main.translator", model="test-model") as mock_t:
+        r = client.post("/api/v1/translate", json={"text": "Hello", "target_lang": "fr"})
+
+    assert r.status_code == 401
+    mock_t.detect_language.assert_not_called()
+    mock_t.translate.assert_not_called()
+
+
+def test_translate_with_default_identity_needs_no_header(
+    client: TestClient, set_default_identity: Callable[[str | None], None]
+) -> None:
+    """The dev fallback identity lets a request without identity headers translate.
+
+    Args:
+        client: TestClient provided by the ``client`` fixture.
+        set_default_identity: Fixture that sets or unsets the default identity.
+    """
+    set_default_identity("zz-dev-user")
+    with patch("translator.main.translator", model="test-model") as mock_t:
+        mock_t.get_language_info.return_value = {"name": "English", "flag": ""}
+        mock_t.translate.return_value = "Bonjour"
+        r = client.post("/api/v1/translate", json={"text": "Hello", "target_lang": "fr", "source_lang": "en"})
+
+    assert r.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "path", ["/api/v1/languages", "/api/v1/version", "/api/v1/config", "/api/v1/whoami", "/api/v1/health", "/metrics"]
+)
+def test_other_endpoints_need_no_identity(
+    client: TestClient, set_edge_secret: Callable[[str | None], None], path: str
+) -> None:
+    """Only ``POST /translate`` needs an authenticated caller; the rest answer anyone, even with the secret enforced.
+
+    Args:
+        client: TestClient provided by the ``client`` fixture.
+        set_edge_secret: Fixture that sets or unsets the edge secret.
+        path: The endpoint.
+    """
+    set_edge_secret(_SECRET)
+    assert client.get(path).status_code == 200
 
 
 # ── GET /health ────────────────────────────────────────────────────────────────

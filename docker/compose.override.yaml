@@ -11,6 +11,12 @@ services:
   backend:
     ports:
       - "${TRANSLATOR_BACKEND_HOST_PORT:-8000}:8000"
+    environment:
+      # No gateway in dev → no request carries X-Auth-User, so set a fallback
+      # account here; /translate answers 401 without one. Ignored while
+      # TRANSLATOR_EDGE_SECRET is set. Production leaves this unset
+      # (fail-closed).
+      TRANSLATOR_DEFAULT_IDENTITY: ${TRANSLATOR_DEFAULT_IDENTITY:-dev}
   frontend:
     ports:
       - "${TRANSLATOR_FRONTEND_HOST_PORT:-8501}:8080"

@@ -4,7 +4,10 @@ Exposes endpoints under ``/api/v1``:
 
 * ``POST /translate`` — accepts text and a target language code, auto-detects
   (or accepts an explicit) source language, and returns the translation together
-  with detected language metadata.
+  with detected language metadata. Requires an authenticated caller
+  (:func:`~translator.identity.resolve_principal`; 401 without one) and writes
+  one ``ai_call`` event to the data-protection audit log
+  (:mod:`translator.audit`).
 * ``GET /languages`` — returns the list of supported language codes and their
   human-readable names sourced from ``language_map.json``.
 * ``GET /version`` — returns the running app version.
@@ -16,30 +19,38 @@ Exposes endpoints under ``/api/v1``:
 
 A single :class:`~translator.engine.Translator` instance is created at startup;
 ``OPENAI_API_BASE`` and ``TEXT_MODEL`` must therefore be set in the environment
-before the server starts.
+before the server starts. The audit emitter, in contrast, is created in the
+lifespan, so each server process writes its own chain.
 """
 
 import json
 import os
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
-from typing import cast
+from typing import Annotated, cast
 
-from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from loguru import logger
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field, field_validator
 
-from translator.engine import Translator
-from translator.identity import get_edge_secret, resolve_identity
+from translator.audit import AuditedCall, audited, get_required_actions, open_emitter, start_chain
+from translator.engine import InferenceTrace, Translator
+from translator.identity import get_default_identity, get_edge_secret, resolve_identity
 from translator.log_cfg import setup_logger
+from translator.utils.audit_event import AiCall, sha256_text
 
 setup_logger()
 
 MAX_TEXT_LENGTH = 20_000
 
 SUPPORTED_UI_LANGUAGES = ("en", "de")
+
+#: The recipient of every translation's audit event: the inference service.
+INFERENCE_RECIPIENT = "inference:translate"
 
 
 def load_ui_language() -> str:
@@ -70,10 +81,34 @@ try:
 except PackageNotFoundError:  # running from source without an installed dist
     _APP_VERSION = "0+unknown"
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Run the process's audit chain for as long as the app serves.
+
+    Opens the chain (``start`` plus the ``config.audit`` record of the
+    operating mode) before the first request and closes it with ``shutdown``
+    after the last. If the chain cannot be opened, startup fails.
+
+    Args:
+        app: The application being served.
+
+    Yields:
+        None: Control to the server while it serves.
+    """
+    emitter = open_emitter(_APP_VERSION)
+    try:
+        start_chain(app, emitter)
+        yield
+    finally:
+        emitter.close()
+
+
 app = FastAPI(
     title="Translator",
     description="Translate text via an OpenAI-compatible inference endpoint.",
     version=_APP_VERSION,
+    lifespan=lifespan,
 )
 # Same-origin model: the SPA is served by nginx, which proxies /api to this
 # backend, so requests are never cross-origin and no CORS policy is needed.
@@ -81,6 +116,10 @@ router = APIRouter(prefix="/api/v1")
 translator = Translator()
 # Startup check: a too-short TRANSLATOR_EDGE_SECRET fails the import here; unset logs one warning.
 get_edge_secret()
+# Startup notice: a set TRANSLATOR_DEFAULT_IDENTITY (dev only) logs one warning.
+get_default_identity()
+# Startup check: an unknown action in AUDIT_REQUIRE_PURPOSE fails the import here.
+get_required_actions()
 
 # Aggregate-only request metrics (method, path template, status, latency) for
 # the obs-plane Prometheus scrape target. No request/response bodies — so no
@@ -194,6 +233,46 @@ def _load_language_codes(
         raise
 
 
+def _record_translation(
+    call: AuditedCall,
+    outcome: str,
+    criteria: dict[str, object],
+    trace: InferenceTrace,
+    translation: str | None = None,
+) -> bool:
+    """Write a translation's one audit event.
+
+    Args:
+        call: The request's audit context.
+        outcome: ``ok`` or ``error``.
+        criteria: The request's parameters.
+        trace: What the inference endpoint reported about the request's calls.
+        translation: The translation returned to the caller; only its hash is
+            recorded.
+
+    Returns:
+        Whether the event was written. A failure is logged by exception type
+        only.
+    """
+    try:
+        call.record(
+            outcome,
+            criteria=criteria,
+            recipient=INFERENCE_RECIPIENT,
+            ai=AiCall(
+                model_alias=translator.model,
+                model_id=trace.model_id,
+                output_sha256=None if translation is None else sha256_text(translation),
+                input_tokens=trace.input_tokens,
+                output_tokens=trace.output_tokens,
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Audit event for /translate could not be written: {type(e).__name__}")
+        return False
+    return True
+
+
 @router.post(
     "/translate",
     summary="Translate text",
@@ -201,48 +280,73 @@ def _load_language_codes(
     tags=["Translation"],
     response_model=TranslationResponse,
 )
-def translate(req: TranslationRequest) -> TranslationResponse | None:
+def translate(
+    req: TranslationRequest,
+    call: Annotated[AuditedCall, Depends(audited("ai_call", "translate"))],
+) -> TranslationResponse:
     """Translate text to the requested target language.
 
     Source language is auto-detected from ``req.text`` unless ``req.source_lang``
     is provided. The target language name is looked up in ``language_map.json``;
     unknown codes are passed through to the model as-is.
 
+    Every request that gets this far writes exactly one ``ai_call`` event:
+    ``denied`` when a required purpose is missing, ``error`` when the
+    translation fails, ``ok`` otherwise. It records the language pair and the
+    input length, never the text or the translation. If the event cannot be
+    written, the translation is not returned.
+
     Args:
         req: Validated translation request containing text, target language code,
             and an optional explicit source language code.
+        call: The request's audit context: who acts, the stated purpose, the
+            correlation id.
 
     Returns:
         A :class:`TranslationResponse` with the translated text and detected
         language metadata.
 
     Raises:
-        HTTPException: 500 if translation fails or the language map cannot be
-            loaded.
+        HTTPException: 428 if ``ai_call`` requires a stated purpose and none
+            was given; 500 if translation fails, the language map cannot be
+            loaded or the audit event cannot be written.
     """
+    criteria: dict[str, object] = {
+        "source_lang": req.source_lang or None,
+        "target_lang": req.target_lang,
+        "input_chars": len(req.text),
+    }
+    call.require_purpose(criteria)
+    trace = InferenceTrace(request_id=call.request_id)
     try:
-        LANGUAGE_NAMES = _load_language_codes()
-        trg_lang_name = LANGUAGE_NAMES.get(req.target_lang, req.target_lang)
+        language_names = _load_language_codes()
+        trg_lang_name = language_names.get(req.target_lang, req.target_lang)
         if req.source_lang:
             detected_lang = translator.get_language_info(req.source_lang)
             src_lang_code = req.source_lang
         else:
-            detected_lang = translator.detect_language(req.text)
+            detected_lang = translator.detect_language(req.text, trace=trace)
             src_lang_code = detected_lang.get("code", "")
+            criteria["detected_lang"] = src_lang_code or None
         src_lang_name = detected_lang.get("name", src_lang_code)
-        result = translator.translate(req.text, src_lang_name, src_lang_code, trg_lang_name, req.target_lang)
-        return TranslationResponse(
+        result = translator.translate(
+            req.text, src_lang_name, src_lang_code, trg_lang_name, req.target_lang, trace=trace
+        )
+        response = TranslationResponse(
             translation=result,
             detected_language=DetectedLanguage(
                 name=detected_lang.get("name", "Unknown"),
                 flag=detected_lang.get("flag", "🏳️"),
             ),
         )
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Error on /translate endpoint: {e}")
+        _record_translation(call, "error", criteria, trace)
         raise HTTPException(status_code=500, detail="Translation failed.") from e
+    if not _record_translation(call, "ok", criteria, trace, response.translation):
+        # Fail closed: a translation that is not on record is not returned.
+        raise HTTPException(status_code=500, detail="Translation failed.")
+    return response
 
 
 @router.get(

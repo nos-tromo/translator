@@ -12,14 +12,18 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from fastapi import Request
+from fastapi import HTTPException, Request
 
 from translator.identity import (
+    DEFAULT_IDENTITY_ENV,
     EDGE_SECRET_ENV,
     MIN_EDGE_SECRET_LENGTH,
     Identity,
+    Principal,
+    get_default_identity,
     get_edge_secret,
     resolve_identity,
+    resolve_principal,
 )
 
 _SECRET = "zz-synthetic-edge-secret-0123456789abcdef"
@@ -173,3 +177,144 @@ def test_unverified_request_without_identity_headers_logs_nothing(
     set_edge_secret(_SECRET)
     assert resolve_identity(_request([])) == Identity()
     assert loguru_warnings == []
+
+
+# ── resolve_principal ──────────────────────────────────────────────────────────
+
+_DEV_IDENTITY = "zz-dev-user"
+
+
+def _translate_request(headers: list[tuple[bytes, bytes]]) -> Request:
+    """Build a ``POST /api/v1/translate`` request carrying exactly these headers.
+
+    Args:
+        headers: Header name/value pairs as raw bytes, as they arrive on the wire.
+
+    Returns:
+        Request: The request as Starlette hands it to a dependency.
+    """
+    return Request({"type": "http", "method": "POST", "path": "/api/v1/translate", "headers": headers})
+
+
+_ALEX = Principal(name="alex", from_gateway=True)
+_DEV = Principal(name=_DEV_IDENTITY, from_gateway=False)
+_VERIFIED = [(b"x-edge-secret", _SECRET.encode()), (b"x-auth-user", b"alex")]
+_WRONG_SECRET = [(b"x-edge-secret", b"zz-synthetic-wrong-secret"), (b"x-auth-user", b"alex")]
+_NO_SECRET = [(b"x-auth-user", b"alex")]
+
+
+@pytest.mark.parametrize(
+    ("secret", "default_identity", "headers", "expected"),
+    [
+        # No edge secret: identity headers are trusted as sent.
+        (None, None, [], None),
+        (None, None, [(b"x-auth-user", b"")], None),
+        (None, None, _NO_SECRET, _ALEX),
+        (None, _DEV_IDENTITY, [], _DEV),
+        (None, _DEV_IDENTITY, _NO_SECRET, _ALEX),
+        # Edge secret set: only edge-verified headers count, and the default identity never does.
+        (_SECRET, None, [], None),
+        (_SECRET, None, _VERIFIED, _ALEX),
+        (_SECRET, None, _WRONG_SECRET, None),
+        (_SECRET, None, _NO_SECRET, None),
+        (_SECRET, _DEV_IDENTITY, [], None),
+        (_SECRET, _DEV_IDENTITY, _VERIFIED, _ALEX),
+        (_SECRET, _DEV_IDENTITY, _WRONG_SECRET, None),
+        (_SECRET, _DEV_IDENTITY, _NO_SECRET, None),
+    ],
+    ids=[
+        "no-secret/no-default/no-header",
+        "no-secret/no-default/empty-header",
+        "no-secret/no-default/header",
+        "no-secret/default/no-header",
+        "no-secret/default/header-wins",
+        "secret/no-default/no-header",
+        "secret/no-default/verified",
+        "secret/no-default/forged-wrong-secret",
+        "secret/no-default/forged-no-secret",
+        "secret/default/no-header",
+        "secret/default/verified",
+        "secret/default/forged-wrong-secret",
+        "secret/default/forged-no-secret",
+    ],
+)
+def test_principal_for_every_combination(
+    set_edge_secret: Callable[[str | None], None],
+    set_default_identity: Callable[[str | None], None],
+    secret: str | None,
+    default_identity: str | None,
+    headers: list[tuple[bytes, bytes]],
+    expected: Principal | None,
+) -> None:
+    """Edge secret (set or not) x default identity (set or not) x identity headers, incl. forged ones.
+
+    The default identity stands in only while no edge secret is set; with
+    one set, a request without an edge-verified identity always gets 401.
+
+    Args:
+        set_edge_secret: Fixture that sets or unsets the edge secret.
+        set_default_identity: Fixture that sets or unsets the default identity.
+        secret: The configured edge secret, or ``None``.
+        default_identity: The configured default identity, or ``None``.
+        headers: The request's headers.
+        expected: The resolved principal, or ``None`` for a 401.
+    """
+    set_edge_secret(secret)
+    set_default_identity(default_identity)
+    request = _translate_request(headers)
+    if expected is None:
+        with pytest.raises(HTTPException) as excinfo:
+            resolve_principal(request)
+        assert excinfo.value.status_code == 401
+    else:
+        assert resolve_principal(request) == expected
+
+
+def test_blank_default_identity_counts_as_unset(set_default_identity: Callable[[str | None], None]) -> None:
+    """A whitespace-only default identity is treated as unset.
+
+    Args:
+        set_default_identity: Fixture that sets or unsets the default identity.
+    """
+    set_default_identity("   ")
+    assert get_default_identity() is None
+
+
+def test_default_identity_is_trimmed_and_announced_once(
+    set_default_identity: Callable[[str | None], None], loguru_warnings: list[str]
+) -> None:
+    """A default identity in effect is trimmed, and one warning names the variable but not the account.
+
+    Args:
+        set_default_identity: Fixture that sets or unsets the default identity.
+        loguru_warnings: Fixture capturing Loguru warnings.
+    """
+    set_default_identity(f"  {_DEV_IDENTITY}\n")
+    assert get_default_identity() == _DEV_IDENTITY
+    assert get_default_identity() == _DEV_IDENTITY
+    announced = [message for message in loguru_warnings if DEFAULT_IDENTITY_ENV in message]
+    assert len(announced) == 1
+    assert f"{DEFAULT_IDENTITY_ENV} is set" in announced[0]
+    assert _DEV_IDENTITY not in announced[0]
+
+
+def test_default_identity_is_ignored_with_one_warning_while_the_edge_secret_is_set(
+    set_edge_secret: Callable[[str | None], None],
+    set_default_identity: Callable[[str | None], None],
+    loguru_warnings: list[str],
+) -> None:
+    """With both set, the default identity is not in effect, and one warning says why.
+
+    Args:
+        set_edge_secret: Fixture that sets or unsets the edge secret.
+        set_default_identity: Fixture that sets or unsets the default identity.
+        loguru_warnings: Fixture capturing Loguru warnings.
+    """
+    set_edge_secret(_SECRET)
+    set_default_identity(_DEV_IDENTITY)
+    assert get_default_identity() is None
+    assert get_default_identity() is None
+    assert len(loguru_warnings) == 1
+    assert f"{DEFAULT_IDENTITY_ENV} is ignored because {EDGE_SECRET_ENV} is set" in loguru_warnings[0]
+    for value in (_DEV_IDENTITY, _SECRET):
+        assert value not in loguru_warnings[0]

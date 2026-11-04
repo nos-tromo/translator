@@ -62,6 +62,12 @@ services:
       # identity headers count only on requests carrying it. Unset: trusted
       # from any caller (legacy).
       TRANSLATOR_EDGE_SECRET: ${TRANSLATOR_EDGE_SECRET:-}
+      # Data-protection audit log (docs/audit.md). The hash-chained events go
+      # to the container's main stdout under a container-wide lock (on the
+      # /tmp tmpfs); ops logs go to stderr.
+      AUDIT_OUTPUT: container
+      # Actions that need a stated purpose (X-Audit-Purpose); empty = none.
+      AUDIT_REQUIRE_PURPOSE: ${AUDIT_REQUIRE_PURPOSE:-}
     env_file: *env-file
     networks:
       translator-net:

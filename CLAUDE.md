@@ -43,7 +43,7 @@ This project uses `uv` (Python 3.11). All commands run inside this directory.
 # Install backend deps
 uv sync                              # production + dev deps
 
-# Run locally (without Docker)
+# Run locally (without Docker) — no gateway, so set TRANSLATOR_DEFAULT_IDENTITY to translate
 uv run uvicorn translator.main:app --reload     # FastAPI on :8000, docs at /docs
 (cd frontend && pnpm install && pnpm dev)        # React SPA on :5173, proxies /api → :8000
 
@@ -86,27 +86,43 @@ uid `10001` (`app`, `HOME=/home/app`), the frontend on
 `nginxinc/nginx-unprivileged` as uid `101` listening on **:8080** (the edge
 gateway's `translator-frontend` upstream must match). Compose applies
 `no-new-privileges`, `cap_drop: ALL`, `read_only: true`, and a `/tmp` tmpfs to
-both services via the `x-hardened` anchor. The backend writes nothing to disk;
-keep it that way — any new writable path needs an explicit tmpfs or volume and
-a note here.
+both services via the `x-hardened` anchor. The backend writes nothing to disk
+except the audit stream's lock file, `/tmp/audit-stream.lock`, on its `/tmp`
+tmpfs (`AUDIT_OUTPUT=container`, see `docs/audit.md`); keep it that way — any
+new writable path needs an explicit tmpfs or volume and a note here.
 
 ## Architecture
 
 ```
 translator/                       # the importable package
-  main.py        FastAPI app. Instantiates a single Translator at startup.
+  main.py        FastAPI app. Instantiates a single Translator at startup;
+                 the lifespan runs the process's audit chain.
                  Endpoints under /api/v1: POST /translate, GET /languages,
                  GET /version, GET /config, GET /whoami, GET /health.
   engine.py      Translator class. Wraps an OpenAI-compatible client to call
                  the configured model for both translation and source-language
                  detection (a small second completions call on a bounded text
                  prefix). Uses pycountry/langcodes/emoji-country-flag for
-                 display metadata.
+                 display metadata. InferenceTrace forwards a request's
+                 X-Request-ID on both calls and collects the reported model
+                 and token usage.
   identity.py    resolve_identity(): the one place that decides whether the
                  gateway's X-Auth-User / X-Auth-Name are trusted, by checking
                  X-Edge-Secret against TRANSLATOR_EDGE_SECRET.
-  log_cfg.py     Loguru setup (stderr only; container driver rotates), plus
-                 the filter that drops query strings from uvicorn's access log.
+                 resolve_principal(): the authenticated caller of /translate
+                 (trusted X-Auth-User, else the dev TRANSLATOR_DEFAULT_IDENTITY
+                 while no edge secret is set, else 401).
+  audit.py       Data-protection audit glue: the per-process emitter, actor
+                 mapping, X-Audit-Purpose, AUDIT_REQUIRE_PURPOSE (428), the
+                 audited() dependency. Reads AUDIT_OUTPUT and
+                 AUDIT_REQUIRE_PURPOSE itself, like identity.py its variables.
+  utils/         audit_event.py + audit_runtime.py: byte-identical copies of
+                 the canonical files in nos-tromo/.github configs/audit/.
+                 Never edit them here.
+  log_cfg.py     Loguru setup (stderr only; container driver rotates), the
+                 filter that drops query strings from uvicorn's access log,
+                 and the move of every stdout log handler (uvicorn's access
+                 log) to stderr — stdout carries audit events only.
   language_map.json
                  Static ISO 639-1 → human-readable name map (~50 entries),
                  mirroring Nextext's translation target-language list.
@@ -140,7 +156,9 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
   `edge-net` (both external, shared). No host ports.
 - `compose.override.yaml` — dev overlay that publishes
   `${TRANSLATOR_BACKEND_HOST_PORT:-8000}` (backend) and
-  `${TRANSLATOR_FRONTEND_HOST_PORT:-8501}` (frontend).
+  `${TRANSLATOR_FRONTEND_HOST_PORT:-8501}` (frontend), and sets
+  `TRANSLATOR_DEFAULT_IDENTITY` (default `dev`) so `/translate` works without
+  the gateway.
 
 ## Environment Variables
 
@@ -153,6 +171,9 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
 | `DEFAULT_TARGET_LANGUAGE` | No (build) | `English` | Default target language; passed as the `VITE_DEFAULT_TARGET_LANGUAGE` build arg and baked into the SPA at image build |
 | `RESPONSE_LANGUAGE` | No | `en` | SPA interface language, `en` or `de`; UI chrome only — the translation target stays a per-request choice |
 | `TRANSLATOR_EDGE_SECRET` | No | — | Secret shared with the edge gateway, sent as `X-Edge-Secret`. Set (≥ 32 characters, else startup fails): identity headers count only on requests carrying it. Unset: trusted from any caller, one startup warning. See `docs/configuration.md` |
+| `TRANSLATOR_DEFAULT_IDENTITY` | No | — (dev overlay: `dev`) | Dev-only account for requests without a trusted `X-Auth-User` (else `/translate` answers 401); ignored while `TRANSLATOR_EDGE_SECRET` is set. Unset in production |
+| `AUDIT_OUTPUT` | No | `stdout` (compose: `container`) | Where the audit events go: the process's stdout, or the container's main stdout under a container-wide lock. Unknown value stops startup |
+| `AUDIT_REQUIRE_PURPOSE` | No | — | Audit actions that need a stated purpose (`X-Audit-Purpose`); only `ai_call` has an effect here (428 without one). Unknown action stops startup. See `docs/audit.md` |
 | `TRANSLATOR_FRONTEND_HOST_PORT` | No | `8501` | Dev-only host port; mapped to the frontend container's nginx on :8080 |
 | `TRANSLATOR_BACKEND_HOST_PORT` | No | `8000` | Dev-only host port for the FastAPI backend |
 | `INFERENCE_NETWORK` | No | `inference-net` | External Docker network the backend joins |
@@ -204,10 +225,19 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
   root-anchored locations apply unchanged, and direct root access 302s to
   `/translator/`. The frontend joins the external `edge-net` as
   `translator-frontend` — the edge-plane gateway is the sole production
-  entry point and supplies `X-Auth-User` / `X-Auth-Name`. translator has no
-  principal seam (unlike chorus/docint/Nextext): the sole consumer is
-  `GET /api/v1/whoami`, which echoes both headers back for the SPA's
-  AppHeader. It is display-only, never an authorization gate, and stays
+  entry point and supplies `X-Auth-User` / `X-Auth-Name`.
+- **`/translate` needs a principal; the rest stays open.** Like
+  chorus/docint/Nextext, translator resolves the caller fail-closed, but only
+  where it must know who acts: `POST /api/v1/translate` depends on
+  `identity.py::resolve_principal` (trusted `X-Auth-User`, else the dev-only
+  `TRANSLATOR_DEFAULT_IDENTITY` while no edge secret is set, else 401). This
+  is a 1.7.0 behaviour change — before, `/translate` served anonymous
+  callers. The dev overlay sets `TRANSLATOR_DEFAULT_IDENTITY=dev` so
+  `make up-dev` translates without the gateway; the production compose file
+  leaves it unset, and with an edge secret set it is ignored (one startup
+  warning).
+  `GET /api/v1/whoami` only echoes the trusted headers for the SPA's
+  AppHeader; it is display-only, never an authorization gate, and stays
   unauthenticated like `/version` and `/config`.
 - **Identity headers count only with the edge secret.** The backend is also
   on the shared `inference-net`, where any container could send `X-Auth-*`
@@ -219,8 +249,22 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
   secret or a header value. Unset or blank keeps the old trust-any-caller
   behaviour plus one startup warning; a value under 32 characters fails the
   import, as a missing `TEXT_MODEL` does. Code that needs the caller's
-  identity calls `resolve_identity` rather than reading the headers. Rollout
-  is gateway first, then the secret here.
+  identity calls `resolve_identity` (or `resolve_principal` where a caller is
+  required) rather than reading the headers. Rollout is gateway first, then
+  the secret here.
+- **Every translation is an audit event, and stdout is the audit lane.**
+  Each translation request writes exactly one `ai_call` event
+  (data-protection audit log, §76 BDSG reference) when it completes — none
+  for a request refused with 401, 422 or 400: actor, stated purpose, request
+  id, recipient
+  `inference:translate`, model and token usage, the SHA-256 of the
+  translation, the language pair and input length — never the text or the
+  translation. Audit writes fail closed: an unrecorded translation is not
+  returned (generic 500). One emitter per process, created in the lifespan,
+  never at import. stdout carries nothing but these events — ops logs,
+  including uvicorn's access log, go to stderr. The vendored
+  `translator/utils/audit_*.py` files are never edited here. Endpoint list,
+  fields and knobs: `docs/audit.md`.
 
 ## Git & PR Workflow
 
