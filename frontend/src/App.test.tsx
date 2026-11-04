@@ -86,7 +86,7 @@ describe('the purpose bar', () => {
     expect(within(dialog).getByLabelText('Aktenzeichen')).toHaveFocus()
     expect(within(dialog).getByLabelText('Begründung')).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Speichern' }))
-    expect(dialog).toHaveTextContent('Bitte geben Sie ein Aktenzeichen oder eine Begründung ein.')
+    expect(dialog).toHaveTextContent('Bitte geben Sie ein Aktenzeichen oder eine Begründung an.')
     await user.type(within(dialog).getByLabelText('Aktenzeichen'), 'case-0001')
     await user.click(within(dialog).getByRole('button', { name: 'Speichern' }))
 

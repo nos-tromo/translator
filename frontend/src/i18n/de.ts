@@ -15,7 +15,7 @@ export const de: Strings = {
   'purpose.title': 'Zweck',
   'purpose.description':
     'Wird mit jeder Ihrer Anfragen in dieser App gesendet, bis Sie ihn ändern oder entfernen oder die Sitzung endet.',
-  'purpose.requested': 'Diese Aktion erfordert die Angabe eines Zwecks.',
+  'purpose.requested': 'Für diese Aktion muss ein Zweck angegeben werden.',
   'purpose.case_ref': 'Aktenzeichen',
   'purpose.reason': 'Begründung',
   'purpose.save': 'Speichern',
@@ -24,7 +24,7 @@ export const de: Strings = {
   'purpose.error_length': 'Höchstens {max} Zeichen.',
   'purpose.error_control': 'Bitte entfernen Sie Zeilenumbrüche, Tabulatoren und andere Steuerzeichen.',
   'purpose.error_header': 'Zusammen zu lang zum Senden. Bitte kürzen Sie eines der Felder.',
-  'purpose.error_empty': 'Bitte geben Sie ein Aktenzeichen oder eine Begründung ein.',
+  'purpose.error_empty': 'Bitte geben Sie ein Aktenzeichen oder eine Begründung an.',
 
   // page
   'page.title': 'Übersetzen',
