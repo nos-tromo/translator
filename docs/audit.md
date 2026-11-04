@@ -123,7 +123,8 @@ sent.
   warning ("Purpose required") and a blank purpose cannot be saved.
 - A request answered with 428 opens the bar's dialog; when the user saves a
   purpose, the request is sent once more with it. Cancelling leaves the 428,
-  which the SPA reports as a failed request.
+  and the SPA says so in its own words instead of its generic error: the
+  action needs a stated purpose, to be stated in the header.
 - The purpose stays in the browser tab's `sessionStorage` — across reloads,
   never into another tab — kept apart from the other apps' behind the same
   gateway, until the user changes or clears it, closes the tab, or signs out

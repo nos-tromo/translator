@@ -33,6 +33,8 @@ export const en = {
   'common.error_request': 'Something went wrong ({status}). Please try again or contact support.',
   'common.error_unknown': 'Something went wrong. Please try again or contact support.',
   'common.error_network': 'Service unreachable. Please check your connection or try again later.',
+  'common.error_purpose_required':
+    'This action needs a stated purpose. Please state one in the header and try again.',
 
   // panel
   'panel.source_language': 'Source language',
