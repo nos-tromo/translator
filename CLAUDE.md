@@ -30,8 +30,8 @@ fronted by a React single-page app (Vite + `@infra/ui`, served by nginx). It
 runs no models of its own — it is a typed, language-aware wrapper around an
 external inference endpoint.
 
-In the nos-tromo federation it sits next to chorus, docint, and Nextext as a
-fourth app: own repo, own release cycle, backend on `inference-net` and
+In the nos-tromo federation it sits next to docint and Nextext as a
+third app: own repo, own release cycle, backend on `inference-net` and
 frontend on `edge-net`, no `data-net` attachment because it has no persistent
 state.
 
@@ -230,7 +230,7 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
   `translator-frontend` — the edge-plane gateway is the sole production
   entry point and supplies `X-Auth-User` / `X-Auth-Name`.
 - **`/translate` needs a principal; the rest stays open.** Like
-  chorus/docint/Nextext, translator resolves the caller fail-closed, but only
+  docint/Nextext, translator resolves the caller fail-closed, but only
   where it must know who acts: `POST /api/v1/translate` depends on
   `identity.py::resolve_principal` (trusted `X-Auth-User`, else the dev-only
   `TRANSLATOR_DEFAULT_IDENTITY` while no edge secret is set, else 401). This
