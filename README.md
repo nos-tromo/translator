@@ -31,7 +31,7 @@ reaches inference over the shared `inference-net` network.
 ## Quick start
 
 ```bash
-cp .env.example .env    # set OPENAI_API_BASE and TEXT_MODEL
+cp .env.example .env    # set OPENAI_API_KEY; the router URL is the default
 make dev                # build, then start backend + SPA detached with host ports
 ```
 
@@ -66,12 +66,12 @@ cd frontend && pnpm install && pnpm dev
 
 ## Configuration
 
-Two variables are required; the rest have working defaults.
+Only the router API key needs setting; the rest have working defaults.
 
 | Variable | Required | Description |
 |---|---|---|
-| `OPENAI_API_BASE` | Yes | Base URL of the OpenAI-compatible endpoint — must include `/v1` |
-| `TEXT_MODEL` | Yes | Model identifier for translation and language detection |
+| `OPENAI_API_BASE` | No | Base URL of the OpenAI-compatible endpoint — must include `/v1`; defaults to the router |
+| `TEXT_MODEL` | No | Model identifier for translation and language detection |
 | `RESPONSE_LANGUAGE` | No | SPA interface language, `en` (default) or `de` |
 | `TRANSLATOR_DEFAULT_IDENTITY` | Dev only | Account to translate as without the edge gateway; the dev overlay sets `dev`. Leave unset in production |
 

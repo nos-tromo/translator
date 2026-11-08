@@ -167,10 +167,10 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `OPENAI_API_BASE` | Yes | — | Base URL of the OpenAI-compatible inference endpoint (e.g. `http://vllm-router:4000/v1` or `http://ollama:11434/v1`) |
+| `OPENAI_API_BASE` | No | — (compose: `http://vllm-router:4000/v1`) | Base URL of the OpenAI-compatible inference endpoint (e.g. `http://ollama:11434/v1`); the code raises when unset outside compose |
 | `OPENAI_API_KEY` | No | `dummy` | API key; `dummy` is fine for local servers that don't enforce auth |
 | `OPENAI_TIMEOUT` | No | `60` | Per-request timeout in seconds |
-| `TEXT_MODEL` | Yes | — (compose fallback: `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`) | Model identifier passed in every chat completions request (translation + language detection — use an instruction-tuned model). Never hardcoded in Python — the fallback lives only in `docker/compose.yaml` |
+| `TEXT_MODEL` | No | — (compose fallback: `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`) | Model identifier passed in every chat completions request (translation + language detection — use an instruction-tuned model). Never hardcoded in Python — the fallback lives only in `docker/compose.yaml` |
 | `DEFAULT_TARGET_LANGUAGE` | No (build) | `English` | Default target language; passed as the `VITE_DEFAULT_TARGET_LANGUAGE` build arg and baked into the SPA at image build |
 | `RESPONSE_LANGUAGE` | No | `en` | SPA interface language, `en` or `de`; UI chrome only — the translation target stays a per-request choice |
 | `TRANSLATOR_EDGE_SECRET` | No | — | Secret shared with the edge gateway, sent as `X-Edge-Secret`. Set (≥ 32 characters, else startup fails): identity headers count only on requests carrying it. Unset: trusted from any caller, one startup warning. See `docs/configuration.md` |
@@ -284,6 +284,10 @@ The frontend (`frontend/`, a separate Vite/React project) never imports
   `ENDPOINT_ACTIONS` (`audited()` refuses any other), and a request the
   browser would make without `fetch` (a download link, a media element) must
   become a `fetch` through the wrapper, or it cannot carry the purpose.
+
+## Environment example
+
+`.env.example` follows deploy's shared format (deploy `docs/runbooks/env-sync.md`, For member authors); check with `python3 -B ../deploy/scripts/check_env_examples.py .`.
 
 ## Git & PR Workflow
 

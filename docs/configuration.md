@@ -4,8 +4,9 @@ Every environment variable translator reads, with its default. Copy
 `.env.example` to `.env` and fill in your values — that file is the source of
 truth for what compose passes into the containers.
 
-Only `OPENAI_API_BASE` and `TEXT_MODEL` are required; everything else has a
-working default. Without the edge gateway, translating also needs
+Nothing is required: `OPENAI_API_BASE` defaults to the router on
+`inference-net` and `TEXT_MODEL` to the compose fallback below, and everything
+else has a working default too. Without the edge gateway, translating also needs
 `TRANSLATOR_DEFAULT_IDENTITY`, which the dev overlay sets — see
 [Default identity](#default-identity-dev-only).
 
@@ -13,10 +14,10 @@ working default. Without the edge gateway, translating also needs
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `OPENAI_API_BASE` | Yes | — | Base URL of the OpenAI-compatible endpoint — must include `/v1` (e.g. `http://vllm-router:4000/v1` or `http://ollama:11434/v1`) |
+| `OPENAI_API_BASE` | No | `http://vllm-router:4000/v1` (compose) | Base URL of the OpenAI-compatible endpoint — must include `/v1` (e.g. `http://ollama:11434/v1`). The code has no default and raises when unset outside compose |
 | `OPENAI_API_KEY` | No | `dummy` | API key; any value works for local servers that do not enforce auth |
 | `OPENAI_TIMEOUT` | No | `60` | Per-request timeout in seconds |
-| `TEXT_MODEL` | Yes | — (compose fallback: `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`) | Model identifier passed in every chat-completions request. It serves both translation and source-language detection, so it must be instruction-tuned. Never hardcoded in Python — the fallback lives only in `docker/compose.yaml` |
+| `TEXT_MODEL` | No | — (compose fallback: `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`) | Model identifier passed in every chat-completions request. It serves both translation and source-language detection, so it must be instruction-tuned. Never hardcoded in Python — the fallback lives only in `docker/compose.yaml` |
 
 translator ships no model weights and runs no local inference. Swapping
 `OPENAI_API_BASE` is the only change needed to move between providers.

@@ -52,7 +52,7 @@ services:
       - /tmp:size=16m
     environment:
       <<: *no-proxy-env
-      OPENAI_API_BASE: ${OPENAI_API_BASE}
+      OPENAI_API_BASE: ${OPENAI_API_BASE:-http://vllm-router:4000/v1}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-dummy}
       TEXT_MODEL: ${TEXT_MODEL:-cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit}
       # Uniform federation UI-language switch (en|de, default en). UI only —
