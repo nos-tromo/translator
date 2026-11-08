@@ -14,7 +14,7 @@ else has a working default too. Without the edge gateway, translating also needs
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `OPENAI_API_BASE` | No | `http://vllm-router:4000/v1` (compose) | Base URL of the OpenAI-compatible endpoint — must include `/v1` (e.g. `http://ollama:11434/v1`). The code has no default and raises when unset outside compose |
+| `OPENAI_API_BASE` | No | `http://vllm-router:4000/v1` (compose) | Base URL of the OpenAI-compatible endpoint — must include `/v1` (e.g. `http://ollama:11434/v1`). The code has no default and raises when unset outside compose. Under compose, a value exported in the shell that runs `make up` beats `.env`, so don't export it in a dev shell |
 | `OPENAI_API_KEY` | No | `dummy` | API key; any value works for local servers that do not enforce auth |
 | `OPENAI_TIMEOUT` | No | `60` | Per-request timeout in seconds |
 | `TEXT_MODEL` | No | — (compose fallback: `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`) | Model identifier passed in every chat-completions request. It serves both translation and source-language detection, so it must be instruction-tuned. Never hardcoded in Python — the fallback lives only in `docker/compose.yaml` |
