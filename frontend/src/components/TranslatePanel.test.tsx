@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import { clearAllPurposes } from '@infra/ui'
@@ -205,5 +205,60 @@ describe('TranslatePanel', () => {
 
     await screen.findByLabelText('Zu übersetzender Text')
     expect(screen.getByRole('button', { name: 'Übersetzen' })).toBeInTheDocument()
+  })
+})
+
+function stubLanguages(translate: () => Promise<Response> = () => new Promise(() => {})) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/api/v1/languages')) {
+        return jsonResponse([
+          { code: 'en', name: 'English' },
+          { code: 'fr', name: 'French' },
+        ])
+      }
+      return translate()
+    }),
+  )
+}
+
+describe('TranslatePanel actions', () => {
+  it('upload and translate share one full-width bar, translate last', async () => {
+    stubLanguages()
+    renderPanel()
+    const translate = await screen.findByRole('button', { name: 'Translate' })
+    const bar = translate.parentElement!
+    expect(bar).toHaveClass('flex-wrap', '*:flex-[1_1_8rem]')
+    expect(bar).toContainElement(screen.getByRole('button', { name: 'Upload .txt' }))
+    expect(bar.lastElementChild).toBe(translate)
+  })
+
+  it('shows the pending state on the button itself', async () => {
+    stubLanguages()
+    renderPanel()
+    await userEvent.type(await screen.findByLabelText('Text to translate'), 'Hello')
+    await userEvent.click(screen.getByRole('button', { name: 'Translate' }))
+    expect(await screen.findByRole('button', { name: 'Translating…' })).toBeDisabled()
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('puts a file error above the bar', async () => {
+    stubLanguages()
+    class FailingReader {
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      result: string | null = null
+      readAsText() {
+        setTimeout(() => this.onerror?.(), 0)
+      }
+    }
+    vi.stubGlobal('FileReader', FailingReader)
+    const { container } = renderPanel()
+    const translate = await screen.findByRole('button', { name: 'Translate' })
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [new File(['x'], 'kaputt.txt')] } })
+    const banner = await screen.findByText(/could not read the file/i)
+    expect(banner.compareDocumentPosition(translate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })

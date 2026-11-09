@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Banner, Button, Spinner } from '@infra/ui'
+import { ActionBar, Banner, Button, Spinner } from '@infra/ui'
 import { describeError } from '../api/errorMessage'
 import { useLanguages } from '../hooks/useLanguages'
 import { useTranslate } from '../hooks/useTranslate'
@@ -80,21 +80,21 @@ export function TranslatePanel() {
         <OutputField value={result?.translation ?? ''} placeholder={t('panel.output_placeholder')} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      {fileError && <Banner variant="danger">{fileError}</Banner>}
+      {translateError && <Banner variant="danger">{t(translateError.key, translateError.vars)}</Banner>}
+
+      {/* One bar under both panes, translate last; upload shares it so the pane bottoms align. */}
+      <ActionBar>
+        <FileTextInput onText={setText} onError={setFileError} />
         <Button
           type="button"
           onClick={onTranslate}
           disabled={text.trim().length === 0 || target === '' || translation.isPending}
         >
-          {t('panel.translate')}
+          {translation.isPending ? t('panel.translating') : t('panel.translate')}
         </Button>
-        <FileTextInput onText={setText} onError={setFileError} />
-        {translation.isPending && <Spinner label={t('panel.translating')} />}
-      </div>
+      </ActionBar>
 
-      {fileError && <Banner variant="danger">{fileError}</Banner>}
-
-      {translateError && <Banner variant="danger">{t(translateError.key, translateError.vars)}</Banner>}
       {result && (
         <DetectedLanguageBanner
           name={result.detected_language.name}
