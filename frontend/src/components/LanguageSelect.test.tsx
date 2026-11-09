@@ -53,4 +53,25 @@ describe('LanguageSelect', () => {
     await userEvent.keyboard('f')
     expect(onChange).toHaveBeenCalledWith('fr')
   })
+
+  it('puts an action on its caption row', () => {
+    render(
+      <LanguageSelect id="target" label="Target language" value="en"
+        onChange={() => {}} languages={LANGS} action={<button>Copy</button>} />,
+    )
+    expect(screen.getByRole('button', { name: 'Copy' }).closest('.flex-wrap')).toHaveTextContent('Target language')
+  })
+
+  it('gives its caption row one height with or without an action, so side-by-side pickers line up', () => {
+    render(
+      <>
+        <LanguageSelect id="source" label="Source language" value="en" onChange={() => {}} languages={LANGS} />
+        <LanguageSelect id="target" label="Target language" value="en" onChange={() => {}} languages={LANGS}
+          action={<button>Copy</button>} />
+      </>,
+    )
+    for (const caption of ['Source language', 'Target language']) {
+      expect(screen.getByText(caption).closest('.flex-wrap')).toHaveClass('min-h-8')
+    }
+  })
 })

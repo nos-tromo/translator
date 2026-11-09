@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import { clearAllPurposes } from '@infra/ui'
@@ -205,5 +205,91 @@ describe('TranslatePanel', () => {
 
     await screen.findByLabelText('Zu übersetzender Text')
     expect(screen.getByRole('button', { name: 'Übersetzen' })).toBeInTheDocument()
+  })
+})
+
+function stubLanguages(translate: () => Promise<Response> = () => new Promise(() => {})) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/api/v1/languages')) {
+        return jsonResponse([
+          { code: 'en', name: 'English' },
+          { code: 'fr', name: 'French' },
+        ])
+      }
+      return translate()
+    }),
+  )
+}
+
+describe('TranslatePanel actions', () => {
+  it('upload and translate share one full-width bar, translate last', async () => {
+    stubLanguages()
+    renderPanel()
+    const translate = await screen.findByRole('button', { name: 'Translate' })
+    const bar = translate.parentElement!
+    expect(bar).toHaveClass('flex-wrap', '*:flex-[1_1_8rem]')
+    expect(bar).toContainElement(screen.getByRole('button', { name: 'Upload .txt' }))
+    expect(bar.lastElementChild).toBe(translate)
+  })
+
+  it('shows the pending state on the button itself', async () => {
+    stubLanguages()
+    renderPanel()
+    await userEvent.type(await screen.findByLabelText('Text to translate'), 'Hello')
+    await userEvent.click(screen.getByRole('button', { name: 'Translate' }))
+    expect(await screen.findByRole('button', { name: 'Translating…' })).toBeDisabled()
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('puts a file error above the bar', async () => {
+    stubLanguages()
+    class FailingReader {
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      result: string | null = null
+      readAsText() {
+        setTimeout(() => this.onerror?.(), 0)
+      }
+    }
+    vi.stubGlobal('FileReader', FailingReader)
+    const { container } = renderPanel()
+    const translate = await screen.findByRole('button', { name: 'Translate' })
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [new File(['x'], 'kaputt.txt')] } })
+    const banner = await screen.findByText(/could not read the file/i)
+    expect(banner.compareDocumentPosition(translate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('copies the translation from the target column header', async () => {
+    stubLanguages(async () =>
+      jsonResponse({ translation: 'Bonjour le monde', detected_language: { name: 'English', flag: '' } }),
+    )
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    renderPanel()
+    const copy = await screen.findByRole('button', { name: 'Copy translation' })
+    expect(copy).toBeDisabled()
+    expect(copy.closest('.flex-wrap')).toHaveTextContent('Target language')
+
+    await userEvent.type(screen.getByLabelText('Text to translate'), 'Hello world')
+    await userEvent.click(screen.getByRole('button', { name: 'Translate' }))
+    await screen.findByText('Bonjour le monde')
+    await userEvent.click(screen.getByRole('button', { name: 'Copy translation' }))
+    expect(writeText).toHaveBeenCalledWith('Bonjour le monde')
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+  })
+
+  it('keeps both panes bounded so a long translation scrolls inside its box', async () => {
+    stubLanguages()
+    renderPanel()
+    const textarea = await screen.findByLabelText('Text to translate')
+    const grid = textarea.parentElement!
+    // Desktop: one row the container caps; phone: each pane its own height.
+    expect(grid).toHaveClass('md:max-h-[32rem]', 'md:grid-rows-[minmax(0,1fr)]')
+    expect(textarea).toHaveClass('h-72', 'md:h-full')
+    const output = grid.lastElementChild!
+    expect(output).toHaveClass('h-72', 'md:h-full', 'overflow-auto')
   })
 })

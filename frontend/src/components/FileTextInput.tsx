@@ -1,4 +1,5 @@
-import type { ChangeEvent } from 'react'
+import { useRef, type ChangeEvent } from 'react'
+import { Button } from '@infra/ui'
 import { useT } from '../i18n/LanguageContext'
 
 interface FileTextInputProps {
@@ -6,9 +7,15 @@ interface FileTextInputProps {
   onError: (message: string) => void
 }
 
-/** A `.txt` picker that reads the file client-side and emits its UTF-8 text. */
+/**
+ * A `.txt` picker that reads the file client-side and emits its UTF-8 text.
+ *
+ * A real button opening a hidden file input, so it sits in the panel's action
+ * bar like any other control and is reachable by keyboard.
+ */
 export function FileTextInput({ onText, onError }: FileTextInputProps) {
   const t = useT()
+  const inputRef = useRef<HTMLInputElement>(null)
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -19,10 +26,19 @@ export function FileTextInput({ onText, onError }: FileTextInputProps) {
     e.target.value = '' // allow re-selecting the same file
   }
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-      <span aria-hidden>📎</span>
-      {t('fileinput.upload_txt')}
-      <input type="file" accept=".txt,text/plain" className="sr-only" onChange={handleChange} />
-    </label>
+    <>
+      <Button type="button" variant="secondary" onClick={() => inputRef.current?.click()}>
+        {t('fileinput.upload_txt')}
+      </Button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".txt,text/plain"
+        className="hidden"
+        tabIndex={-1}
+        aria-hidden
+        onChange={handleChange}
+      />
+    </>
   )
 }
