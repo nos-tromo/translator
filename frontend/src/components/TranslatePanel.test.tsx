@@ -280,4 +280,16 @@ describe('TranslatePanel actions', () => {
     expect(writeText).toHaveBeenCalledWith('Bonjour le monde')
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
   })
+
+  it('keeps both panes bounded so a long translation scrolls inside its box', async () => {
+    stubLanguages()
+    renderPanel()
+    const textarea = await screen.findByLabelText('Text to translate')
+    const grid = textarea.parentElement!
+    // Desktop: one row the container caps; phone: each pane its own height.
+    expect(grid).toHaveClass('md:max-h-[32rem]', 'md:grid-rows-[minmax(0,1fr)]')
+    expect(textarea).toHaveClass('h-72', 'md:h-full')
+    const output = grid.lastElementChild!
+    expect(output).toHaveClass('h-72', 'md:h-full', 'overflow-auto')
+  })
 })

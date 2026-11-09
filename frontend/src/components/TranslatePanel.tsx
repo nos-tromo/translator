@@ -77,13 +77,14 @@ export function TranslatePanel() {
         />
       </div>
 
-      <div className="grid max-h-[32rem] min-h-0 flex-1 gap-4 md:grid-cols-2">
+      {/* Desktop: one row, capped, both panes scroll inside it. Phone: stacked, each its own height. */}
+      <div className="grid gap-4 md:min-h-72 md:max-h-[32rem] md:flex-1 md:grid-cols-2 md:grid-rows-[minmax(0,1fr)]">
         <textarea
           aria-label={t('panel.text_aria')}
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={t('panel.text_placeholder')}
-          className="h-full min-h-72 w-full resize-none rounded-lg border border-border bg-muted p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="h-72 w-full resize-none rounded-lg md:h-full border border-border bg-muted p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         />
         <OutputField value={result?.translation ?? ''} placeholder={t('panel.output_placeholder')} />
       </div>

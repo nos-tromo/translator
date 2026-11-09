@@ -17,15 +17,14 @@ describe('FileTextInput', () => {
     expect(click).toHaveBeenCalledOnce()
   })
 
-  it('loads the same file twice', async () => {
+  it('clears its value after each pick, so the same file can be picked again', async () => {
     const onText = vi.fn()
     const { container } = render(<FileTextInput onText={onText} onError={vi.fn()} />)
-    const file = new File(['Hallo Welt'], 'notiz.txt', { type: 'text/plain' })
-    fireEvent.change(fileInput(container), { target: { files: [file] } })
-    await waitFor(() => expect(onText).toHaveBeenCalledTimes(1))
-    fireEvent.change(fileInput(container), { target: { files: [file] } })
-    await waitFor(() => expect(onText).toHaveBeenCalledTimes(2))
-    expect(onText).toHaveBeenLastCalledWith('Hallo Welt')
+    const input = fileInput(container)
+    const set = vi.spyOn(input, 'value', 'set')
+    fireEvent.change(input, { target: { files: [new File(['Hallo Welt'], 'notiz.txt', { type: 'text/plain' })] } })
+    await waitFor(() => expect(onText).toHaveBeenCalledWith('Hallo Welt'))
+    expect(set).toHaveBeenCalledWith('')
   })
 
   it('draws no typed symbol', () => {
