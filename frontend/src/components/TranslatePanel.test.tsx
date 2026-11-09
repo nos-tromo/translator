@@ -261,4 +261,23 @@ describe('TranslatePanel actions', () => {
     const banner = await screen.findByText(/could not read the file/i)
     expect(banner.compareDocumentPosition(translate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
+
+  it('copies the translation from the target column header', async () => {
+    stubLanguages(async () =>
+      jsonResponse({ translation: 'Bonjour le monde', detected_language: { name: 'English', flag: '' } }),
+    )
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    renderPanel()
+    const copy = await screen.findByRole('button', { name: 'Copy translation' })
+    expect(copy).toBeDisabled()
+    expect(copy.closest('.flex-wrap')).toHaveTextContent('Target language')
+
+    await userEvent.type(screen.getByLabelText('Text to translate'), 'Hello world')
+    await userEvent.click(screen.getByRole('button', { name: 'Translate' }))
+    await screen.findByText('Bonjour le monde')
+    await userEvent.click(screen.getByRole('button', { name: 'Copy translation' }))
+    expect(writeText).toHaveBeenCalledWith('Bonjour le monde')
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+  })
 })

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ActionBar, Banner, Button, Spinner } from '@infra/ui'
+import { ActionBar, Banner, Button, CopyButton, Spinner } from '@infra/ui'
 import { describeError } from '../api/errorMessage'
 import { useLanguages } from '../hooks/useLanguages'
 import { useTranslate } from '../hooks/useTranslate'
@@ -66,6 +66,14 @@ export function TranslatePanel() {
           value={target}
           onChange={setTargetOverride}
           languages={languages}
+          action={
+            <CopyButton
+              text={result?.translation ?? ''}
+              label={t('output.copy_translation')}
+              copiedLabel={t('common.copied')}
+              disabled={!result?.translation}
+            />
+          }
         />
       </div>
 

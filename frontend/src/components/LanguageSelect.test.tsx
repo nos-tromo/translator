@@ -53,4 +53,12 @@ describe('LanguageSelect', () => {
     await userEvent.keyboard('f')
     expect(onChange).toHaveBeenCalledWith('fr')
   })
+
+  it('puts an action on its caption row', () => {
+    render(
+      <LanguageSelect id="target" label="Target language" value="en"
+        onChange={() => {}} languages={LANGS} action={<button>Copy</button>} />,
+    )
+    expect(screen.getByRole('button', { name: 'Copy' }).closest('.flex-wrap')).toHaveTextContent('Target language')
+  })
 })
