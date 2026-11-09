@@ -37,7 +37,8 @@ export function LanguageSelect({
     // accessible name. The trigger shows a language, which is a value and
     // cannot name the control.
     <div id={id} className="flex flex-col gap-1 text-sm text-muted-foreground">
-      <SectionHeader caption={label} actions={action} />
+      {/* One height with or without an action, so the two pickers side by side line up. */}
+      <SectionHeader className="min-h-8" caption={label} actions={action} />
       <SelectMenu
         variant="field"
         label={label}
