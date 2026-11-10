@@ -46,7 +46,7 @@ from translator.audit import (
     required_endpoint_actions,
     start_chain,
 )
-from translator.engine import InferenceTrace, Translator
+from translator.engine import InferenceTrace, Translator, cache_scope_for
 from translator.identity import get_default_identity, get_edge_secret, resolve_identity
 from translator.log_cfg import setup_logger
 from translator.utils.audit_event import AiCall, sha256_text
@@ -334,7 +334,8 @@ def translate(
         "input_chars": len(req.text),
     }
     call.require_purpose(criteria)
-    trace = InferenceTrace(request_id=call.request_id)
+    user = call.actor.user
+    trace = InferenceTrace(request_id=call.request_id, cache_scope=cache_scope_for(user) if user else None)
     try:
         language_names = _load_language_codes()
         trg_lang_name = language_names.get(req.target_lang, req.target_lang)

@@ -23,6 +23,7 @@ from openai.types.completion_usage import CompletionUsage
 from tests.conftest import CapturedAuditStream
 from translator import main
 from translator.audit import EMITTER_STATE_KEY, OUTPUT_ENV, REQUIRE_PURPOSE_ENV, SERVICE, audited, get_required_actions
+from translator.engine import cache_scope_for
 from translator.main import app
 from translator.utils.audit_event import AuditEmitter, sha256_text, verify_chain
 from translator.utils.audit_runtime import PURPOSE_HEADER, encode_purpose
@@ -212,10 +213,12 @@ def test_failed_translation_writes_one_error_event(
     assert event["ai"] == {"model_alias": "test-model"}
 
 
-def test_event_carries_reported_usage_and_upstream_gets_only_the_request_id(
+def test_event_carries_reported_usage_and_upstream_gets_only_the_request_id_and_cache_scope(
     client: TestClient, audit_stream: CapturedAuditStream, edge_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """With the real engine, the event sums both calls' usage; upstream sees the correlation id only.
+    """With the real engine, the event sums both calls' usage; upstream sees the correlation id and cache scope only.
+
+    The cache scope is the user's per-process pseudonym, never the name itself.
 
     Args:
         client: TestClient provided by the ``client`` fixture.
@@ -243,7 +246,8 @@ def test_event_carries_reported_usage_and_upstream_gets_only_the_request_id(
         "output_tokens": 21,
     }
     calls = upstream.chat.completions.create.call_args_list
-    assert [call.kwargs["extra_headers"] for call in calls] == [{"X-Request-ID": _REQUEST_ID}] * 2
+    expected = {"X-Request-ID": _REQUEST_ID, "X-Cache-Scope": cache_scope_for(_USER)}
+    assert [call.kwargs["extra_headers"] for call in calls] == [expected] * 2
     sent = repr(calls)
     for value in (_USER, _SECRET, _CASE_REF, "Quality review"):
         assert value not in sent
