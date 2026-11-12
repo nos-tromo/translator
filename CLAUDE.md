@@ -105,8 +105,9 @@ translator/                       # the importable package
                  detection (a small second completions call on a bounded text
                  prefix). Uses pycountry/langcodes/emoji-country-flag for
                  display metadata. InferenceTrace forwards a request's
-                 X-Request-ID on both calls and collects the reported model
-                 and token usage.
+                 X-Request-ID and the caller's X-Cache-Scope pseudonym
+                 (cache_scope_for, keyed per process) on both calls and
+                 collects the reported model and token usage.
   identity.py    resolve_identity(): the one place that decides whether the
                  gateway's X-Auth-User / X-Auth-Name are trusted, by checking
                  X-Edge-Secret against TRANSLATOR_EDGE_SECRET.

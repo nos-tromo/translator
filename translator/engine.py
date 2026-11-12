@@ -4,13 +4,16 @@ Wraps the OpenAI Python client to call an instruction-tuned model (e.g.
 Gemma-class) served by any OpenAI-compatible inference backend. Language
 detection is delegated to the same model; country flag emojis are resolved
 via ``langcodes`` and ``emoji-country-flag``. An :class:`InferenceTrace`
-carries a request's correlation id to the endpoint and brings back what the
-endpoint reports about the calls.
+carries a request's correlation id and the caller's cache scope to the
+endpoint and brings back what the endpoint reports about the calls.
 """
 
+import hashlib
+import hmac
 import logging
 import os
 import re
+import secrets
 from dataclasses import dataclass
 
 import flag
@@ -28,6 +31,28 @@ DETECTION_PREFIX_LIMIT = 500
 # bare two-letter token is only trusted when it is the whole reply, because
 # English filler words ("is", "in", "it") collide with valid ISO 639-1 codes.
 _PARENTHESISED_CODE_RE = re.compile(r"\(\s*[\"']?([a-z]{2})[\"']?\s*\)")
+
+CACHE_SCOPE_HEADER = "X-Cache-Scope"
+
+# Keys the cache scopes; it never leaves this process, so a scope cannot be
+# mapped back to a user anywhere else. A restart gives every user a new scope.
+_CACHE_SCOPE_KEY = secrets.token_bytes(32)
+
+
+def cache_scope_for(name: str) -> str:
+    """Return the cache scope of a user: a pseudonym stable within this process.
+
+    The inference router gives calls with the same scope one prompt-prefix
+    cache and calls with different scopes separate ones, so one user cannot
+    time whether another user's text is cached.
+
+    Args:
+        name: The authenticated user's name.
+
+    Returns:
+        64 lowercase hex characters.
+    """
+    return hmac.new(_CACHE_SCOPE_KEY, b"cache-scope/v1\0" + name.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 class _FixedReasonError(RuntimeError):
@@ -79,12 +104,16 @@ class InferenceTrace:
 
     Sends the request's correlation id to the inference endpoint as
     ``X-Request-ID`` on every call, so the endpoint's records can be matched
-    with the request, and collects what the endpoint reports back: the model
-    that served and the token usage. It carries nothing else upstream —
-    never the caller's identity or stated purpose.
+    with the request, and the caller's cache scope as ``X-Cache-Scope``, so
+    the endpoint keeps the caller's cached prompt prefixes apart from other
+    users'. It collects what the endpoint reports back: the model that served
+    and the token usage. It carries nothing else upstream — never the
+    caller's identity or stated purpose; the scope is a pseudonym keyed in
+    this process (:func:`cache_scope_for`).
 
     Attributes:
         request_id: The correlation id to forward, or ``None`` to send none.
+        cache_scope: The caller's cache scope, or ``None`` to send none.
         model_id: The model named in the last completed call's reply.
         calls: How many calls completed.
         prompt_tokens: Prompt tokens summed over the completed calls.
@@ -93,6 +122,7 @@ class InferenceTrace:
     """
 
     request_id: str | None = None
+    cache_scope: str | None = None
     model_id: str | None = None
     calls: int = 0
     prompt_tokens: int = 0
@@ -103,9 +133,15 @@ class InferenceTrace:
         """Return the extra headers for an inference call.
 
         Returns:
-            ``{"X-Request-ID": <id>}``, or ``None`` without a correlation id.
+            ``X-Request-ID`` and ``X-Cache-Scope``, each when set, or ``None``
+            when neither is.
         """
-        return {REQUEST_ID_HEADER: self.request_id} if self.request_id else None
+        headers: dict[str, str] = {}
+        if self.request_id:
+            headers[REQUEST_ID_HEADER] = self.request_id
+        if self.cache_scope:
+            headers[CACHE_SCOPE_HEADER] = self.cache_scope
+        return headers or None
 
     def record(self, response: ChatCompletion) -> None:
         """Take note of one completed call's reply.

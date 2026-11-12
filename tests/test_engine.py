@@ -5,6 +5,7 @@ client is replaced with a :class:`unittest.mock.MagicMock` wherever a network
 call would otherwise be made.
 """
 
+import re
 from unittest.mock import MagicMock
 
 import pytest
@@ -13,7 +14,7 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice
 from openai.types.completion_usage import CompletionUsage
 
-from translator.engine import DETECTION_PREFIX_LIMIT, InferenceTrace, Translator
+from translator.engine import DETECTION_PREFIX_LIMIT, InferenceTrace, Translator, cache_scope_for
 
 
 @pytest.fixture
@@ -514,6 +515,36 @@ def test_no_correlation_header_without_request_id(translator: Translator, trace:
     translator.translate("Hello", "English", "en", "French", "fr", trace=trace)
 
     assert [call.kwargs["extra_headers"] for call in create.call_args_list] == [None, None]
+
+
+@pytest.mark.parametrize("request_id", ["zz-request-0004", None], ids=["with-request-id", "without-request-id"])
+def test_trace_forwards_cache_scope_on_both_calls(translator: Translator, request_id: str | None) -> None:
+    """Both calls of a request carry the caller's cache scope, beside any correlation id.
+
+    Args:
+        translator: Translator instance provided by the ``translator`` fixture.
+        request_id: The correlation id of the request, if any.
+    """
+    translator.client = MagicMock()
+    create = translator.client.chat.completions.create
+    create.return_value = _reply("en", prompt_tokens=1, completion_tokens=1)
+    scope = cache_scope_for("zz-alice")
+    trace = InferenceTrace(request_id=request_id, cache_scope=scope)
+
+    translator.detect_language("Hello", trace=trace)
+    translator.translate("Hello", "English", "en", "French", "fr", trace=trace)
+
+    expected = {"X-Request-ID": request_id, "X-Cache-Scope": scope} if request_id else {"X-Cache-Scope": scope}
+    assert [call.kwargs["extra_headers"] for call in create.call_args_list] == [expected] * 2
+
+
+def test_cache_scope_is_a_stable_per_user_pseudonym() -> None:
+    """A user's scope is stable within the process, differs between users, and does not contain the name."""
+    alice = cache_scope_for("zz-alice")
+    assert alice == cache_scope_for("zz-alice")
+    assert alice != cache_scope_for("zz-bob")
+    assert re.fullmatch(r"[0-9a-f]{64}", alice)
+    assert "zz-alice" not in alice
 
 
 def test_trace_has_no_token_counts_when_a_call_reports_none(translator: Translator) -> None:

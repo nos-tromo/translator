@@ -154,8 +154,13 @@ to 128 letters, digits and `._:-`, starting with a letter or digit (anything
 else is dropped, not repaired). The same id goes to the inference service as
 `X-Request-ID` on each model call of the request — one, or two with
 source-language detection — so the service's own records can be matched with
-the event. Nothing else about the caller goes upstream: never the identity,
-the purpose or the edge secret.
+the event. Each call also carries `X-Cache-Scope`, a pseudonym of the user
+under a key that exists only in this process, so the inference service keeps
+each user's cached prompt prefixes apart and one user cannot time whether
+another's text is cached (vllm-service `docs/api-reference.md`, "Cache
+scope"); it cannot be mapped back to the user outside this process, and a
+restart changes it. Nothing else about the caller goes upstream: never the
+identity, the purpose or the edge secret.
 
 ## Fail closed
 
